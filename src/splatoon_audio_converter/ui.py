@@ -10,19 +10,23 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, QTimer, QUrl, Signal, Slot, QRectF
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPen, QPixmap
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit,
+    QHeaderView, QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit,
     QProgressBar, QPushButton, QScrollArea, QSlider, QSplitter, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget, QAbstractItemView,
 )
 
 from . import __version__, updates
 from .core import BarsDocument, Track, bars_base_name, bars_zs_name, bfstm_name, bwav_name, read_pcm16
-from .preview import Preview, prepare, with_volume
+from .preview import Preview, prepare
 from .fonts import configure
+from .playback import PreviewPlayer
+from .preferences import AppearanceSettings
+from .theme import PALETTES, active_palette, apply_theme, blend
+from .window_chrome import ThemedWindow
 
 APP_NAME = "Splatoon Audio Converter"
 FILTERS = ("Splatoon audio (*.bars.zs *.bars *.bwav *.bwav.zs *.bfstm *.bfstm.zs);;"
@@ -56,7 +60,8 @@ def button(text: str, callback, style: str = "") -> QPushButton:
     return widget
 
 
-def playback_icon(shape="play", color="#291535"):
+def playback_icon(shape="play", color=None):
+    color = color or active_palette().on_accent
     pixmap = QPixmap(22, 22)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
@@ -109,9 +114,12 @@ class Backdrop(QWidget):
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor("#18141e"))
+        palette = active_palette()
+        painter.fillRect(self.rect(), QColor(palette.background))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor(170, 110, 235, 23), 1.1))
+        motif = QColor(palette.accent)
+        motif.setAlpha(23)
+        painter.setPen(QPen(motif, 1.1))
         for y in range(-30, self.height() + 50, 84):
             path = QPainterPath()
             path.moveTo(-20, y)
@@ -146,21 +154,22 @@ class Waveform(QWidget):
 
     def paintEvent(self, event):
         p = QPainter(self)
+        palette = active_palette()
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setBrush(QColor("#201626"))
-        p.setPen(QPen(QColor("#564066"), 1))
+        p.setBrush(QColor(blend(palette.background, "#000000", .08)))
+        p.setPen(QPen(QColor(palette.line), 1))
         p.drawRoundedRect(QRectF(self.rect()).adjusted(.5, .5, -.5, -.5), 11, 11)
         area = self.rect().adjusted(30, 24, -20, -25)
         for i in range(5):
             y = area.top() + area.height() * i / 4
-            p.setPen(QPen(QColor("#382740"), 1))
+            p.setPen(QPen(QColor(blend(palette.background, palette.accent, .14)), 1))
             p.drawLine(area.left(), round(y), area.right(), round(y))
         for i in range(1, 8):
             x = area.left() + area.width() * i / 8
-            p.setPen(QPen(QColor("#312138"), 1))
+            p.setPen(QPen(QColor(blend(palette.background, palette.accent, .10)), 1))
             p.drawLine(round(x), area.top(), round(x), area.bottom())
         if self.peaks is None:
-            p.setPen(QColor("#b59bc8"))
+            p.setPen(QColor(palette.muted))
             p.drawText(area, Qt.AlignmentFlag.AlignCenter, self.message)
             return
         count = min(len(self.peaks), max(1, area.width() // 3))
@@ -168,12 +177,12 @@ class Waveform(QWidget):
         for i, index in enumerate(indices):
             x = area.left() + area.width() * i / max(1, count - 1)
             height = max(1.5, float(self.peaks[index]) * area.height() * .45)
-            p.setPen(QPen(QColor("#e8c4ff") if i / max(1, count) <= self.position else QColor("#a773d3"), 1.5))
+            p.setPen(QPen(QColor(blend(palette.accent, palette.text, .65)) if i / max(1, count) <= self.position else QColor(palette.accent), 1.5))
             p.drawLine(round(x), round(area.center().y() - height), round(x), round(area.center().y() + height))
         x = area.left() + self.position * area.width()
-        p.setPen(QPen(QColor("#f4e4ff"), 1.3))
+        p.setPen(QPen(QColor(palette.text), 1.3))
         p.drawLine(round(x), area.top(), round(x), area.bottom())
-        p.setPen(QColor("#b49bc7"))
+        p.setPen(QColor(palette.muted))
         tick_font = QFont(self.font())
         tick_font.setPixelSize(12)
         p.setFont(tick_font)
@@ -209,9 +218,10 @@ class Job(QRunnable):
             self.signals.failed.emit(message or "The operation could not be completed.")
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
+class MainWindow(ThemedWindow):
+    def __init__(self, preferences=None, player=None):
         super().__init__()
+        self.preferences = preferences or AppearanceSettings()
         self.document: BarsDocument | None = None
         self.busy = self.dirty = False
         self.preview: Preview | None = None
@@ -221,27 +231,39 @@ class MainWindow(QMainWindow):
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(1)
         self.jobs = set()
-        self.audio = QAudioOutput(self)
-        self.audio.setVolume(1)
-        self.player = QMediaPlayer(self)
-        self.player.setAudioOutput(self.audio)
+        self.player = player or PreviewPlayer(self)
+        self.audio = self.player.output
         self.player.positionChanged.connect(self.position_changed)
         self.player.playbackStateChanged.connect(self.playback_changed)
         self.player.errorOccurred.connect(self.playback_error)
-        self.player.mediaStatusChanged.connect(self.media_ready)
-        self.pending_seek = None
-        self.volume_timer = QTimer(self)
-        self.volume_timer.setSingleShot(True)
-        self.volume_timer.setInterval(180)
-        self.volume_timer.timeout.connect(self.refresh_volume_preview)
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(1120, 740)
         self.resize(1460, 920)
         self.setAcceptDrops(True)
         self._build_shortcuts()
         self._build_ui()
+        self.set_theme(self.preferences.theme, save=False)
         self.set_busy(False)
         self.log("Ready. Open an audio file, or drop one anywhere in this window.")
+
+    def set_theme(self, name, save=True):
+        self.theme_name = apply_theme(QApplication.instance(), name)
+        self.theme_actions[self.theme_name].setChecked(True)
+        palette = active_palette()
+        self.playback_changed(self.player.playbackState())
+        self.restart_button.setIcon(playback_icon("restart", palette.text))
+        row_icon = playback_icon("play", palette.accent)
+        for row in range(self.table.rowCount()):
+            self.table.item(row, 0).setIcon(row_icon)
+            self.table.item(row, 0).setForeground(QColor(palette.accent))
+            self.table.item(row, 5).setForeground(QColor(palette.text))
+        self.wave.update()
+        self.titlebar.update()
+        if save:
+            try:
+                self.preferences.save_theme(self.theme_name)
+            except OSError:
+                QMessageBox.warning(self, APP_NAME, "The theme changed, but its preference could not be saved.")
 
     def _build_shortcuts(self):
         # Keyboard commands remain available without a native File/Playback/Help bar.
@@ -278,6 +300,20 @@ class MainWindow(QMainWindow):
         title.addWidget(label("Extract WAVs, replace audio tracks or preview sounds.", "Muted"))
         header.addLayout(title)
         header.addStretch()
+        self.settings_button = button("Settings", lambda: None, "Link")
+        self.theme_menu = QMenu(self.settings_button)
+        self.theme_menu.addSection("Application theme")
+        self.theme_actions = {}
+        group = QActionGroup(self.theme_menu)
+        group.setExclusive(True)
+        for name in PALETTES:
+            action = self.theme_menu.addAction(name)
+            action.setCheckable(True)
+            group.addAction(action)
+            action.triggered.connect(lambda checked=False, name=name: self.set_theme(name))
+            self.theme_actions[name] = action
+        self.settings_button.setMenu(self.theme_menu)
+        header.addWidget(self.settings_button)
         self.update_button = button("Check for Updates", self.check_updates, "Primary")
         self.update_button.setToolTip("Check this app's latest GitHub release")
         header.addWidget(self.update_button)
@@ -328,7 +364,6 @@ class MainWindow(QMainWindow):
         self.replacement_count = label("No replacements queued", "Tiny", True)
         for w in (self.extract_selected_button, self.extract_all_button, self.replacement_count, self.save_button):
             export.body.addWidget(w)
-        export.body.addWidget(label("The original file is kept unchanged.\nNo manifest or extra JSON files.", "Tiny", True))
         column.addWidget(export)
 
         tips = Panel("QUICK GUIDE")
@@ -369,7 +404,7 @@ class MainWindow(QMainWindow):
         self.play_button.setIcon(playback_icon())
         self.play_button.setAccessibleName("Play or pause the selected sound")
         self.restart_button = button("", self.replay, "Restart")
-        self.restart_button.setIcon(playback_icon("restart", "#e8cbff"))
+        self.restart_button.setIcon(playback_icon("restart", active_palette().text))
         self.restart_button.setAccessibleName("Replay the selected track from the beginning")
         self.restart_button.setToolTip("Replay from the beginning (Ctrl+R)")
         self.time_label = label("00:00.00 / 00:00.00", "Muted")
@@ -380,11 +415,11 @@ class MainWindow(QMainWindow):
         transport.addStretch()
         transport.addWidget(label("VOLUME", "Tiny"))
         self.volume = QSlider(Qt.Orientation.Horizontal)
-        self.volume.setRange(0, 200)
+        self.volume.setRange(0, 300)
         self.volume.setValue(100)
         self.volume.setFixedWidth(105)
         self.volume.valueChanged.connect(self.change_volume)
-        self.volume.setAccessibleName("Preview volume, from zero to two hundred percent")
+        self.volume.setAccessibleName("Preview volume, from zero to three hundred percent")
         self.volume.setToolTip("Preview only. Boost above 100% can distort loud sounds; exports are unchanged.")
         self.volume_label = label("100%", "Tiny")
         self.volume_label.setMinimumWidth(39)
@@ -478,11 +513,6 @@ class MainWindow(QMainWindow):
         replace.body.addWidget(self.replacement_label)
         replace.body.addWidget(self.replace_button)
         replace.body.addWidget(self.clear_button)
-        replace.body.addWidget(label("Mono or stereo, 16-bit PCM WAV.\nSample rate and channels are matched automatically.", "Tiny", True))
-        replace.body.addWidget(label("LOOP BEHAVIOR", "Section"))
-        replace.body.addWidget(label("Preserve the original loop", "Tiny", True))
-        self.loop_label = label("One-shot sounds stay one-shot. Looped sounds keep looping in game.", "Tiny", True)
-        replace.body.addWidget(self.loop_label)
         column.addWidget(replace)
 
         volume = Panel("AUDIO LEVELS")
@@ -622,8 +652,8 @@ class MainWindow(QMainWindow):
                 if col in (0, 2):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if col == 0:
-                    item.setIcon(playback_icon("play", "#d6abff"))
-                    item.setForeground(QColor("#d6abff"))
+                    item.setIcon(playback_icon("play", active_palette().accent))
+                    item.setForeground(QColor(active_palette().accent))
                     item.setToolTip("Preview this track")
                 self.table.setItem(row, col, item)
         self.table.blockSignals(False)
@@ -672,10 +702,6 @@ class MainWindow(QMainWindow):
             self.source_combo.setCurrentIndex(0)
             self.source_combo.blockSignals(False)
         self.replacement_label.setText(replacement.name if replacement else "Keep original audio")
-        if track.loop_end >= 0:
-            self.loop_label.setText(f"Original loop starts at {track.loop_start / track.sample_rate:.3f} s. Its position is adjusted to fit replacement length.")
-        else:
-            self.loop_label.setText("This sound plays once in game. Replacement audio will also play once.")
         self.set_busy(self.busy)
         if not self.busy:
             self.ensure_preview()
@@ -685,20 +711,18 @@ class MainWindow(QMainWindow):
         if not self.busy:
             self.ensure_preview()
 
-    def ensure_preview(self, play=False, resume_position=None):
+    def ensure_preview(self, play=False):
         track = self.current()
         if not track or self.busy:
             return
         document = self.document
         replacement = self.source_combo.currentIndex() == 1
         replacement_path = document.replacements.get(track.name) if replacement else None
-        gain = max(100, self.volume.value())
-        key = (id(document), track.index, str(replacement_path) if replacement_path else "original", gain)
+        key = (id(document), track.index, str(replacement_path) if replacement_path else "original")
         if self.current_preview_key == key and self.preview:
             if play:
                 self.player.play()
             return
-        reusable = self.preview if self.current_preview_key and self.current_preview_key[:-1] == key[:-1] else None
         self.stop()
         self.pending_play = play
         self.wave.clear("Preparing waveform…")
@@ -716,43 +740,20 @@ class MainWindow(QMainWindow):
             self.wave.set_preview(preview)
             self.peak_value.setText(db(preview.peak_db))
             self.rms_value.setText(db(preview.average_db))
-            self.pending_seek = resume_position
-            self.player.setSource(QUrl.fromLocalFile(str(preview.playback_path or preview.path)))
+            self.player.setSource(QUrl.fromLocalFile(str(preview.path)))
             self.time_label.setText(f"00:00.00 / {clock(preview.duration)}")
             if self.pending_play:
                 self.player.play()
             self.pending_play = False
-            if preview.gain != max(100, self.volume.value()):
-                self.volume_timer.start()
-        operation = (lambda _: with_volume(reusable, cache, gain)) if reusable else (
-            lambda _: prepare(document, track, cache, replacement, gain))
-        self.run_job("Preparing selected sound…", operation, done)
+        self.run_job("Preparing selected sound…", lambda _: prepare(document, track, cache, replacement), done)
 
     def change_volume(self, value):
         self.volume_label.setText(f"{value}%")
-        self.audio.setVolume(min(value / 100, 1))
-        if self.preview and self.preview.gain != max(100, value):
-            self.volume_timer.start()
-
-    def refresh_volume_preview(self):
-        if self.busy:
-            self.volume_timer.start()
-            return
-        if not self.preview or not self.current() or self.preview.gain == max(100, self.volume.value()):
-            return
-        playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
-        self.ensure_preview(play=playing, resume_position=self.player.position())
-
-    def media_ready(self, status):
-        if status in (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.BufferedMedia):
-            if self.pending_seek is not None:
-                position, self.pending_seek = self.pending_seek, None
-                self.player.setPosition(position)
+        self.audio.setVolume(value / 100)
 
     def replay(self):
         if self.busy or not self.current():
             return
-        self.pending_seek = None
         self.player.setPosition(0)
         self.ensure_preview(play=True)
 
@@ -775,7 +776,6 @@ class MainWindow(QMainWindow):
     def stop(self):
         self.player.stop()
         self.pending_play = False
-        self.pending_seek = None
 
     def seek(self, fraction):
         if self.preview and not self.busy:
@@ -816,7 +816,7 @@ class MainWindow(QMainWindow):
         self.document.replacements[track.name] = path
         self.dirty = True
         self.table.item(track.index, 5).setText("Replaced")
-        self.table.item(track.index, 5).setForeground(QColor("#d9aaff"))
+        self.table.item(track.index, 5).setForeground(QColor(active_palette().accent))
         self.log(f"Queued {path.name} for {track.name} ({len(pcm) / rate:.2f} s).")
         self.replacements_changed()
         self.current_preview_key = None

@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import math
 import wave
-import hashlib
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -20,30 +19,6 @@ class Preview:
     peak_db: float
     average_db: float
     replacement: bool
-    playback_path: Path | None = None
-    gain: int = 100
-
-
-def with_volume(preview: Preview, cache: Path, volume: int) -> Preview:
-    """Boost temporary playback audio only; originals/exports are never changed."""
-    gain = max(100, min(200, volume))
-    if gain == 100:
-        return replace(preview, playback_path=preview.path, gain=gain)
-    stat = preview.path.stat()
-    key = f"{preview.path.resolve()}|{stat.st_size}|{stat.st_mtime_ns}|{gain}"
-    name = hashlib.sha256(key.encode()).hexdigest()[:24]
-    target = cache / f"volume-{name}.wav"
-    if not target.is_file():
-        cache.mkdir(parents=True, exist_ok=True)
-        with wave.open(str(preview.path), "rb") as source, wave.open(str(target), "wb") as output:
-            if source.getsampwidth() != 2 or source.getcomptype() != "NONE":
-                raise ValueError("Preview boost requires a 16-bit PCM WAV.")
-            output.setparams(source.getparams())
-            while block := source.readframes(65536):
-                pcm = np.frombuffer(block, dtype="<i2").astype(np.float64)
-                pcm = np.clip(np.rint(pcm * gain / 100), -32768, 32767).astype("<i2")
-                output.writeframesraw(pcm.tobytes())
-    return replace(preview, playback_path=target, gain=gain)
 
 
 def waveform(path: Path, bins: int = 1200) -> tuple[np.ndarray, float, float, float]:
@@ -72,7 +47,7 @@ def waveform(path: Path, bins: int = 1200) -> tuple[np.ndarray, float, float, fl
             20 * math.log10(rms / 32768) if rms else -math.inf)
 
 
-def prepare(document: BarsDocument, track: Track, cache: Path, replacement: bool, volume: int = 100) -> Preview:
+def prepare(document: BarsDocument, track: Track, cache: Path, replacement: bool) -> Preview:
     replacement_path = document.replacements.get(track.name) if replacement else None
     if replacement_path:
         path = replacement_path
@@ -84,4 +59,4 @@ def prepare(document: BarsDocument, track: Track, cache: Path, replacement: bool
             else:
                 rate, channels = document.decode_track(track)
                 write_wav(path, rate, channels)
-    return with_volume(Preview(path, *waveform(path), bool(replacement_path)), cache, volume)
+    return Preview(path, *waveform(path), bool(replacement_path))

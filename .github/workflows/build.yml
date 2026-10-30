@@ -31,6 +31,10 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tests/smoke_ui.py
+      - name: Check continuous playback and live volume changes
+        env:
+          PYTHONPATH: src
+        run: python tests/smoke_playback.py
       - name: Build portable application
         run: python -m PyInstaller --noconfirm 'Splatoon Audio Converter.spec'
       - name: Verify the packaged executable

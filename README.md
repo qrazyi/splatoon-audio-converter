@@ -2,7 +2,7 @@
 
 Extract WAVs, replace audio tracks or preview sounds.
 
-A standalone desktop app with a purple theme, rounded controls and a
+A standalone desktop app with five themes, rounded controls and a
 three-column audio workbench. The visual arrangement was inspired by
 [HoianViewer](https://github.com/nvnprogram/HoianViewer), but its UI code, fonts,
 artwork and game assets have not been copied into this project.
@@ -12,7 +12,7 @@ artwork and game assets have not been copied into this project.
 
 ![Audio workbench](docs/preview.png)
 
-The preview shows an optional user-supplied font. Public downloads use the system
+The preview shows the default Beige theme and an optional user-supplied font. Public downloads use the system
 font unless you supply your own; Nintendo font software is not redistributed.
 
 ## Windows download
@@ -45,10 +45,24 @@ Drag and drop also works. To preview audio, click a track's play icon or the lar
 play/pause button. The circular-arrow button immediately replays from the start,
 even when paused. Click the waveform to seek.
 
-Preview volume defaults to 100% and supports 0–200%. Above 100%, the app amplifies
-a temporary playback copy (up to +6 dB). Loud sounds may clip. This does not
+Preview volume defaults to 100% and supports 0–300% (up to +9.54 dB). Gain changes
+are applied to small audio buffers in real time, without stopping the track,
+reopening files, rewriting WAVs or refreshing the waveform. Short gain ramps
+reduce clicks. Loud sounds may clip. This does not
 change original files, extracted WAVs, saved replacements or the displayed
 measurements of the source track.
+
+### Appearance settings
+
+Open **Settings** to choose **Beige**, **Navy Blue**, **Brown**, **Purple** or
+**Green**. Beige is the default for a fresh install. Your choice is remembered
+between launches. It changes the whole interface, including the title bar,
+window controls, waveform, menus and buttons.
+
+The themed title bar supports dragging and double-clicking to maximize/restore,
+with minimize, maximize/restore and close controls. Window borders can be dragged
+to resize. Appearance settings contain only the theme name, never audio paths,
+and are stored in your account's application settings, not beside game files.
 
 For replacements, use a **mono/stereo 16-bit PCM WAV**. The Original sound /
 Replacement WAV selector lets you compare them. Sample rate and channel count
@@ -117,6 +131,7 @@ python scripts/build_native.py
 $env:PYTHONPATH = "src"
 python -m unittest discover -s tests -p "test_*.py" -v
 python tests/smoke_ui.py
+python tests/smoke_playback.py
 python launch.py
 python -m PyInstaller --noconfirm "Splatoon Audio Converter.spec"
 python scripts/smoke_frozen.py

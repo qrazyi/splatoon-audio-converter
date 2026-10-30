@@ -4,10 +4,11 @@ import sys
 
 from PySide6.QtGui import QFont, QFontDatabase
 
-from .theme import STYLE
+from .theme import apply_theme
+from .preferences import AppearanceSettings
 
 
-def configure(app):
+def configure(app, theme_name=None):
     package = Path(__file__).resolve().parent
     candidates = [package / "assets/fonts/NinDev-Treasure_00.ttf"]
     if getattr(sys, "frozen", False):
@@ -25,7 +26,6 @@ def configure(app):
                 break
     app.setFont(QFont(family, 11))
     app.setStyle("Fusion")
-    safe_family = family.replace("\\", "\\\\").replace("'", "\\'")
-    app.setStyleSheet(STYLE.replace("UI_FONT", safe_family))
     app.setProperty("interfaceFont", family)
+    apply_theme(app, theme_name or AppearanceSettings().theme)
     return family

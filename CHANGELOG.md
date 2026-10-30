@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0
+
+- Settings button with Beige (default), Navy Blue, Brown, Purple and Green themes.
+- All themes include the title bar and normal window controls.
+- Appearance choice is remembered between launches, with no audio paths saved.
+- Preview volume now supports 0–300%.
+- Replaced boosted-WAV regeneration with live, click-ramped PCM gain, preventing
+  volume changes from stopping/reloading the track or interrupting the interface.
+- Removed the requested replacement-format, loop-behavior and export-note texts.
+- Added continuous-playback, rapid-volume, saved-theme and window-frame tests.
+
 ## 2.1.0
 
 - Purple standalone desktop interface with rounded panels.

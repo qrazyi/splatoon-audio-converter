@@ -8,13 +8,15 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "windows" if sys.platform == "win32" else "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt, QCoreApplication, QEvent
-from PySide6.QtMultimedia import QMediaPlayer
+from PySide6.QtMultimedia import QMediaDevices, QMediaPlayer
 from splatoon_audio_converter.ui import MainWindow
 from splatoon_audio_converter import updates
 from splatoon_audio_converter.fonts import configure
+from splatoon_audio_converter.preferences import AppearanceSettings
+from splatoon_audio_converter.theme import PALETTES
 from fixtures import bars, replacement_wav
 
 
@@ -29,8 +31,9 @@ def wait_ready(app, window, timeout=30):
 
 def main():
     app = QApplication([])
-    configure(app)
-    window = MainWindow()
+    configure(app, "Beige")
+    preferences_folder = tempfile.TemporaryDirectory()
+    window = MainWindow(AppearanceSettings(Path(preferences_folder.name) / "appearance.ini"))
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
     window.show()
     app.processEvents()
@@ -47,21 +50,19 @@ def main():
         assert window.preview and window.preview.duration == .32
         assert window.update_button.text() == "Check for Updates"
         assert not window.findChildren(__import__("PySide6.QtWidgets", fromlist=["QMenuBar"]).QMenuBar)
-        assert window.volume.maximum() == 200
+        assert window.volume.maximum() == 300
         assert window.volume.value() == 100
         window.audio.setMuted(True)
-        window.toggle_play()
-        deadline = time.monotonic() + 5
-        while window.player.playbackState() != QMediaPlayer.PlaybackState.PlayingState and time.monotonic() < deadline:
+        if not QMediaDevices.defaultAudioOutput().isNull():
+            window.toggle_play()
             app.processEvents()
-            time.sleep(.01)
-        assert window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState, "Preview playback did not start"
-        window.player.setPosition(160)
-        window.player.pause()
-        window.restart_button.click()
-        app.processEvents()
-        assert window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState, "Replay must resume playback, not leave it paused"
-        assert window.player.position() < 100, "Replay did not seek back to the start"
+            assert window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState, "Preview playback did not start"
+            window.player.setPosition(160)
+            window.player.pause()
+            window.restart_button.click()
+            app.processEvents()
+            assert window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState, "Replay must resume playback, not leave it paused"
+            assert window.player.position() < 100, "Replay did not seek back to the start"
         window.stop()
         assert window.player.playbackState() == QMediaPlayer.PlaybackState.StoppedState
         window.table.selectRow(2)
@@ -80,19 +81,33 @@ def main():
         window.table.selectRow(2)
         wait_ready(app, window)
         assert window.wave.peaks is not None
-        window.volume.setValue(200)
-        window.volume_timer.stop()
-        window.refresh_volume_preview()
-        wait_ready(app, window)
-        assert window.preview.gain == 200
-        assert window.preview.playback_path != window.preview.path
+        preview, source = window.preview, window.player.source()
+        with patch.object(window.player, "setSource", wraps=window.player.setSource) as reload, patch.object(window.player, "stop", wraps=window.player.stop) as stop:
+            for value in range(0, 301, 3):
+                window.volume.setValue(value)
+            reload.assert_not_called()
+            stop.assert_not_called()
+        assert not window.busy and window.preview is preview and window.player.source() == source
+        assert window.audio.volume() == 3
         window.volume.setValue(75)
-        window.volume_timer.stop()
-        window.refresh_volume_preview()
-        wait_ready(app, window)
-        assert window.preview.gain == 100
         assert abs(window.audio.volume() - .75) < .001
-        assert window.preview.playback_path == window.preview.path
+        assert not list(Path(window.preview_cache.name).glob("volume-*.wav"))
+        texts = "\n".join(widget.text() for widget in window.findChildren(QLabel))
+        for removed in ("LOOP BEHAVIOR", "Preserve the original loop", "Mono or stereo, 16-bit PCM WAV.", "No manifest or extra JSON files."):
+            assert removed not in texts
+        for name in PALETTES:
+            window.theme_actions[name].trigger()
+            app.processEvents()
+            assert window.theme_name == name
+            assert window.preferences.theme == name
+            assert window.grab().save(str(output / ("theme-" + name.lower().replace(" ", "-") + ".png")))
+        window.set_theme("Beige")
+        assert window.titlebar.caption.text() == "Splatoon Audio Converter"
+        window.toggle_maximized()
+        assert window.isMaximized()
+        window.toggle_maximized()
+        assert not window.isMaximized()
+        window.resize(1460, 920)
         with patch.object(updates, "check", return_value=None) as check, patch("splatoon_audio_converter.ui.QMessageBox.information") as notice:
             window.update_button.click()
             wait_ready(app, window)
@@ -107,7 +122,8 @@ def main():
         window.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         app.processEvents()
-    print("PASS: open, duration, waveform, playback, immediate replay, 200% boost, selection, replacement, levels, filter and screenshots")
+    preferences_folder.cleanup()
+    print("PASS: audio UI, immediate replay, 300% live volume without reloads, removed text, five saved themes and themed titlebar.")
 
 
 if __name__ == "__main__":

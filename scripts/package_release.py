@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def source_files():
     for name in ("launch.py", "pyproject.toml", "Splatoon Audio Converter.spec",
-                 "README.md", "THIRD_PARTY_NOTICES.md", "LICENSE", ".gitignore"):
+                 "README.md", "THIRD_PARTY_NOTICES.md", "LICENSE", "CHANGELOG.md", ".gitignore"):
         yield ROOT / name
     for name in ("src", "tests", "scripts", "native-src", "licenses", ".github", "fonts", "docs"):
         for path in sorted((ROOT / name).rglob("*")):
