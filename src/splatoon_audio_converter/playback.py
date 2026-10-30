@@ -1,11 +1,11 @@
-"""Small-buffer PCM playback. Volume changes never reload audio or write files."""
+"""Dedicated-thread PCM playback, independent of UI focus and repaint timing."""
 from __future__ import annotations
 
 import wave
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import QObject, QTimer, QUrl, Signal
+from PySide6.QtCore import QCoreApplication, QMetaObject, QObject, QThread, QTimer, QUrl, Qt, Signal, Slot
 from PySide6.QtMultimedia import QAudio, QAudioFormat, QAudioSink, QMediaDevices, QMediaPlayer
 
 
@@ -41,11 +41,12 @@ class PreviewOutput:
         return self._muted
 
 
-class PreviewPlayer(QObject):
+class _PlaybackEngine(QObject):
     positionChanged = Signal(int)
     playbackStateChanged = Signal(QMediaPlayer.PlaybackState)
     mediaStatusChanged = Signal(QMediaPlayer.MediaStatus)
     errorOccurred = Signal(QMediaPlayer.Error, str)
+    durationChanged = Signal(int)
 
     def __init__(self, parent=None, sink_factory=None):
         super().__init__(parent)
@@ -60,9 +61,25 @@ class PreviewPlayer(QObject):
         self._pending = b""
         self._eof = self._resetting = False
         self._gain = 1.0
+        self.underruns = 0
+        self.bytes_streamed = 0
         self._timer = QTimer(self)
-        self._timer.setInterval(10)
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self._timer.setInterval(5)
         self._timer.timeout.connect(self._pump)
+
+    @Slot(str, object)
+    def command(self, name, value):
+        if name == "source":
+            self.setSource(value)
+        elif name == "position":
+            self.setPosition(value)
+        elif name in ("play", "pause", "stop"):
+            getattr(self, name)()
+
+    @Slot()
+    def clear_source(self):
+        self.setSource(QUrl())
 
     def _set_state(self, state):
         if self._state != state:
@@ -111,13 +128,17 @@ class PreviewPlayer(QObject):
             self._sink.deleteLater()
             self._sink = None
         self._source = QUrl(url)
+        self.underruns = 0
+        self.bytes_streamed = 0
         self._set_status(QMediaPlayer.MediaStatus.NoMedia)
         if url.isEmpty():
+            self.durationChanged.emit(0)
             return
         try:
             self._reader = wave.open(str(Path(url.toLocalFile())), "rb")
             if self._reader.getsampwidth() != 2 or self._reader.getcomptype() != "NONE":
                 raise ValueError("Preview requires 16-bit PCM WAV audio.")
+            self.durationChanged.emit(self.duration())
             self._set_status(QMediaPlayer.MediaStatus.LoadedMedia)
         except (OSError, ValueError, wave.Error) as error:
             if self._reader:
@@ -138,7 +159,10 @@ class PreviewPlayer(QObject):
             if device.isNull() or not device.isFormatSupported(format):
                 raise ValueError("The output device does not support this audio format.")
             sink = QAudioSink(device, format, self)
-        sink.setBufferSize(max(1024, format.bytesForDuration(40000)))
+        # The old 40 ms GUI-fed queue underruns when Windows occludes the UI.
+        # A dedicated precise-timer thread and 200 ms queue tolerate background
+        # scheduling delays without depending on repaint or window events.
+        sink.setBufferSize(max(1024, format.bytesForDuration(200000)))
         sink.stateChanged.connect(self._sink_state)
         return sink
 
@@ -212,6 +236,7 @@ class PreviewPlayer(QObject):
             written = self._device.write(self._pending[:free])
             if written > 0:
                 self._pending = self._pending[written:]
+                self.bytes_streamed += written
         position = self.position()
         if abs(position - self._last_position) >= 30:
             self._last_position = position
@@ -224,6 +249,8 @@ class PreviewPlayer(QObject):
             return
         if state == QAudio.State.IdleState and self._eof and not self._pending:
             self._ended()
+        elif state == QAudio.State.IdleState and self._state == QMediaPlayer.PlaybackState.PlayingState:
+            self.underruns += 1
         elif state == QAudio.State.StoppedState and self._sink and self._sink.error() != QAudio.Error.NoError:
             self._timer.stop()
             self._set_state(QMediaPlayer.PlaybackState.StoppedState)
@@ -236,3 +263,100 @@ class PreviewPlayer(QObject):
         self._set_state(QMediaPlayer.PlaybackState.StoppedState)
         self._set_status(QMediaPlayer.MediaStatus.EndOfMedia)
         self.positionChanged.emit(self.duration())
+
+
+class PreviewPlayer(QObject):
+    """GUI-side transport; all sink, timer and file operations live off the UI."""
+    positionChanged = Signal(int)
+    playbackStateChanged = Signal(QMediaPlayer.PlaybackState)
+    mediaStatusChanged = Signal(QMediaPlayer.MediaStatus)
+    errorOccurred = Signal(QMediaPlayer.Error, str)
+    _request = Signal(str, object)
+
+    def __init__(self, parent=None, sink_factory=None):
+        super().__init__(parent)
+        self.output = PreviewOutput()
+        self._source = QUrl()
+        self._position = self._duration = 0
+        self._state = QMediaPlayer.PlaybackState.StoppedState
+        self._status = QMediaPlayer.MediaStatus.NoMedia
+        self._closed = False
+        self._thread = QThread(self)
+        self._thread.setObjectName("Audio playback")
+        self._engine = _PlaybackEngine(sink_factory=sink_factory)
+        self._engine.output = self.output
+        self._engine.moveToThread(self._thread)
+        self._request.connect(self._engine.command, Qt.ConnectionType.QueuedConnection)
+        self._engine.positionChanged.connect(self._on_position)
+        self._engine.durationChanged.connect(self._on_duration)
+        self._engine.playbackStateChanged.connect(self._on_state)
+        self._engine.mediaStatusChanged.connect(self._on_status)
+        self._engine.errorOccurred.connect(self.errorOccurred)
+        self._thread.finished.connect(self._engine.deleteLater)
+        self._thread.start(QThread.Priority.HighPriority)
+        if QCoreApplication.instance():
+            QCoreApplication.instance().aboutToQuit.connect(self.shutdown)
+
+    @Slot(int)
+    def _on_position(self, value):
+        self._position = value
+        self.positionChanged.emit(value)
+
+    @Slot(int)
+    def _on_duration(self, value):
+        self._duration = value
+
+    @Slot(QMediaPlayer.PlaybackState)
+    def _on_state(self, value):
+        self._state = value
+        self.playbackStateChanged.emit(value)
+
+    @Slot(QMediaPlayer.MediaStatus)
+    def _on_status(self, value):
+        self._status = value
+        self.mediaStatusChanged.emit(value)
+
+    def source(self): return self._source
+    def position(self): return self._position
+    def duration(self): return self._duration
+    def playbackState(self): return self._state
+    def mediaStatus(self): return self._status
+
+    def setSource(self, url):
+        if self._closed:
+            return
+        self._source = QUrl(url)
+        self._position = self._duration = 0
+        if url.isEmpty():
+            # Release the reader before the GUI deletes its temporary WAVs.
+            QMetaObject.invokeMethod(self._engine, "clear_source", Qt.ConnectionType.BlockingQueuedConnection)
+            self._state = QMediaPlayer.PlaybackState.StoppedState
+            self._status = QMediaPlayer.MediaStatus.NoMedia
+        else:
+            self._request.emit("source", QUrl(url))
+
+    def play(self):
+        if not self._closed:
+            self._request.emit("play", None)
+
+    def pause(self):
+        if not self._closed:
+            self._request.emit("pause", None)
+
+    def stop(self):
+        if not self._closed:
+            self._request.emit("stop", None)
+
+    def setPosition(self, value):
+        if not self._closed:
+            self._position = max(0, int(value))
+            self._request.emit("position", self._position)
+
+    @Slot()
+    def shutdown(self):
+        if self._closed:
+            return
+        self.setSource(QUrl())
+        self._closed = True
+        self._thread.quit()
+        self._thread.wait(3000)

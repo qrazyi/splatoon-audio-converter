@@ -1,11 +1,12 @@
 from pathlib import Path
 import tempfile
 import unittest
+import time
 
 from PySide6.QtCore import QCoreApplication, QObject, QUrl, Signal
 from PySide6.QtMultimedia import QAudio, QMediaPlayer
 from fixtures import replacement_wav
-from splatoon_audio_converter.playback import PreviewPlayer
+from splatoon_audio_converter.playback import PreviewPlayer, _PlaybackEngine
 
 
 class FakeDevice:
@@ -58,7 +59,7 @@ class PlaybackTests(unittest.TestCase):
             path = Path(folder) / "preview.wav"
             replacement_wav(path, seconds=10)
             original = path.read_bytes()
-            player = PreviewPlayer(sink_factory=FakeSink)
+            player = _PlaybackEngine(sink_factory=FakeSink)
             player.setSource(QUrl.fromLocalFile(str(path)))
             player.play()
             reader, sink = player._reader, player._sink
@@ -78,7 +79,7 @@ class PlaybackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "preview.wav"
             replacement_wav(path, seconds=2)
-            player = PreviewPlayer(sink_factory=FakeSink)
+            player = _PlaybackEngine(sink_factory=FakeSink)
             player.setSource(QUrl.fromLocalFile(str(path)))
             player.play()
             player._sink.elapsed = 150000
@@ -99,3 +100,27 @@ class PlaybackTests(unittest.TestCase):
             self.assertEqual(player.playbackState(), QMediaPlayer.PlaybackState.PlayingState)
             self.assertEqual(player.position(), 0)
             player.setSource(QUrl())
+
+    def test_audio_worker_keeps_feeding_when_gui_thread_is_blocked(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "preview.wav"
+            replacement_wav(path, seconds=15)
+            player = PreviewPlayer(sink_factory=FakeSink)
+            try:
+                player.setSource(QUrl.fromLocalFile(str(path)))
+                player.play()
+                deadline = time.monotonic() + 3
+                while player.playbackState() != QMediaPlayer.PlaybackState.PlayingState and time.monotonic() < deadline:
+                    self.app.processEvents()
+                    time.sleep(.005)
+                self.assertEqual(player.playbackState(), QMediaPlayer.PlaybackState.PlayingState)
+                self.assertIsNot(player._engine.thread(), self.app.thread())
+                written = len(player._engine._sink.device.data)
+                # Intentionally do not dispatch any GUI events during this stall.
+                time.sleep(.35)
+                self.assertGreater(len(player._engine._sink.device.data), written)
+                self.assertEqual(player._engine._sink.starts, 1)
+                self.assertEqual(player._engine._sink.resets, 0)
+            finally:
+                player.shutdown()
+            self.assertFalse(player._thread.isRunning())

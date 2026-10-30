@@ -10,10 +10,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "windows" if sys.platform == "win32" el
 
 from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtGui import QFont
-from PySide6.QtCore import Qt, QCoreApplication, QEvent
+from PySide6.QtCore import Qt, QCoreApplication, QEvent, QPointF
 from PySide6.QtMultimedia import QMediaDevices, QMediaPlayer
 from splatoon_audio_converter.ui import MainWindow
-from splatoon_audio_converter import updates
 from splatoon_audio_converter.fonts import configure
 from splatoon_audio_converter.preferences import AppearanceSettings
 from splatoon_audio_converter.theme import PALETTES
@@ -29,9 +28,17 @@ def wait_ready(app, window, timeout=30):
     assert not window.busy, "Background operation timed out"
 
 
+def until(app, condition, timeout=5):
+    deadline = time.monotonic() + timeout
+    while not condition() and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(.005)
+    assert condition(), "Asynchronous audio operation did not complete"
+
+
 def main():
     app = QApplication([])
-    configure(app, "Beige")
+    configure(app, "Brown")
     preferences_folder = tempfile.TemporaryDirectory()
     window = MainWindow(AppearanceSettings(Path(preferences_folder.name) / "appearance.ini"))
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
@@ -48,22 +55,27 @@ def main():
         assert window.table.rowCount() == 10
         assert window.table.item(0, 2).text() == "00:00.32"
         assert window.preview and window.preview.duration == .32
-        assert window.update_button.text() == "Check for Updates"
+        assert window.themes_button.text() == "Themes"
+        assert window.theme_name == "Brown"
+        assert not hasattr(window, "update_button") and not hasattr(window, "github_button")
+        assert not hasattr(window, "check_updates")
         assert not window.findChildren(__import__("PySide6.QtWidgets", fromlist=["QMenuBar"]).QMenuBar)
         assert window.volume.maximum() == 300
         assert window.volume.value() == 100
         window.audio.setMuted(True)
         if not QMediaDevices.defaultAudioOutput().isNull():
             window.toggle_play()
-            app.processEvents()
+            until(app, lambda: window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
             assert window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState, "Preview playback did not start"
             window.player.setPosition(160)
             window.player.pause()
+            until(app, lambda: window.player.playbackState() == QMediaPlayer.PlaybackState.PausedState)
             window.restart_button.click()
-            app.processEvents()
+            until(app, lambda: window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState and window.player.position() < 100)
             assert window.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState, "Replay must resume playback, not leave it paused"
             assert window.player.position() < 100, "Replay did not seek back to the start"
         window.stop()
+        until(app, lambda: window.player.playbackState() == QMediaPlayer.PlaybackState.StoppedState)
         assert window.player.playbackState() == QMediaPlayer.PlaybackState.StoppedState
         window.table.selectRow(2)
         wait_ready(app, window)
@@ -74,7 +86,6 @@ def main():
         wait_ready(app, window)
         assert window.table.item(2, 5).text() == "Replaced"
         assert window.preview.replacement
-        assert window.peak_value.text().endswith("dBFS")
         window.search.setText("Cancel")
         assert sum(not window.table.isRowHidden(i) for i in range(10)) == 1
         window.search.clear()
@@ -93,7 +104,7 @@ def main():
         assert abs(window.audio.volume() - .75) < .001
         assert not list(Path(window.preview_cache.name).glob("volume-*.wav"))
         texts = "\n".join(widget.text() for widget in window.findChildren(QLabel))
-        for removed in ("LOOP BEHAVIOR", "Preserve the original loop", "Mono or stereo, 16-bit PCM WAV.", "No manifest or extra JSON files."):
+        for removed in ("AUDIO LEVELS", "LOOP BEHAVIOR", "Preserve the original loop", "Mono or stereo, 16-bit PCM WAV.", "No manifest or extra JSON files."):
             assert removed not in texts
         for name in PALETTES:
             window.theme_actions[name].trigger()
@@ -101,19 +112,29 @@ def main():
             assert window.theme_name == name
             assert window.preferences.theme == name
             assert window.grab().save(str(output / ("theme-" + name.lower().replace(" ", "-") + ".png")))
-        window.set_theme("Beige")
+        window.set_theme("Brown")
         assert window.titlebar.caption.text() == "Splatoon Audio Converter"
+        window.update_resize_cursor(QPointF(1, 1))
+        assert window.cursor().shape() == Qt.CursorShape.SizeFDiagCursor
         window.toggle_maximized()
+        app.processEvents()
         assert window.isMaximized()
+        assert window.cursor().shape() == Qt.CursorShape.ArrowCursor
+        window.update_resize_cursor(QPointF(1, 1))
+        assert window.cursor().shape() == Qt.CursorShape.ArrowCursor
         window.toggle_maximized()
         assert not window.isMaximized()
+        window.update_resize_cursor(QPointF(1, 1))
+        window.showFullScreen()
+        app.processEvents()
+        assert window.cursor().shape() == Qt.CursorShape.ArrowCursor
+        window.update_resize_cursor(QPointF(1, 1))
+        assert window.cursor().shape() == Qt.CursorShape.ArrowCursor
+        window.showNormal()
+        window.update_resize_cursor(QPointF(1, 1))
+        window.update_resize_cursor(QPointF(100, 100))
+        assert window.cursor().shape() == Qt.CursorShape.ArrowCursor
         window.resize(1460, 920)
-        with patch.object(updates, "check", return_value=None) as check, patch("splatoon_audio_converter.ui.QMessageBox.information") as notice:
-            window.update_button.click()
-            wait_ready(app, window)
-            check.assert_called_once()
-            notice.assert_called_once()
-            assert window.update_button.isEnabled()
         app.processEvents()
         assert window.grab().save(str(output / "workbench.png"))
         window.dirty = False
@@ -123,7 +144,7 @@ def main():
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         app.processEvents()
     preferences_folder.cleanup()
-    print("PASS: audio UI, immediate replay, 300% live volume without reloads, removed text, five saved themes and themed titlebar.")
+    print("PASS: glass UI, seven sorted themes, Brown default, removed controls, asynchronous playback and fullscreen/interior cursor recovery.")
 
 
 if __name__ == "__main__":

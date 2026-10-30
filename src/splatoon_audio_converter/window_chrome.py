@@ -1,13 +1,15 @@
 """Themeable title bar with native drag/resize and normal window controls."""
 from PySide6.QtCore import QEvent, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QToolButton, QWidget
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QMainWindow, QToolButton, QWidget
 
 from .theme import active_palette
 
 
 def resize_edges(x, y, width, height, border=5):
     edges = Qt.Edge(0)
+    if not (0 <= x < width and 0 <= y < height):
+        return edges
     if x < border:
         edges |= Qt.Edge.LeftEdge
     elif x >= width - border:
@@ -86,12 +88,13 @@ class ThemedWindow(QMainWindow):
         self.setMouseTracking(True)
         self.titlebar = TitleBar(self)
         self.setMenuWidget(self.titlebar)
+        QApplication.instance().installEventFilter(self)
 
     def toggle_maximized(self):
         self.showNormal() if self.isMaximized() else self.showMaximized()
 
     def try_resize(self, point):
-        if self.isMaximized() or not self.windowHandle():
+        if self.isMaximized() or self.isFullScreen() or not self.windowHandle():
             return False
         local = self.mapFromGlobal(point)
         edges = resize_edges(local.x(), local.y(), self.width(), self.height())
@@ -105,7 +108,11 @@ class ThemedWindow(QMainWindow):
 
     def mouseMoveEvent(self, event):
         pos = event.position()
-        edges = resize_edges(pos.x(), pos.y(), self.width(), self.height()) if not self.isMaximized() else Qt.Edge(0)
+        self.update_resize_cursor(pos)
+        super().mouseMoveEvent(event)
+
+    def update_resize_cursor(self, pos):
+        edges = resize_edges(pos.x(), pos.y(), self.width(), self.height()) if not (self.isMaximized() or self.isFullScreen()) else Qt.Edge(0)
         horizontal = edges & (Qt.Edge.LeftEdge | Qt.Edge.RightEdge)
         vertical = edges & (Qt.Edge.TopEdge | Qt.Edge.BottomEdge)
         if horizontal and vertical:
@@ -113,12 +120,24 @@ class ThemedWindow(QMainWindow):
             cursor = Qt.CursorShape.SizeFDiagCursor if forward else Qt.CursorShape.SizeBDiagCursor
         else:
             cursor = Qt.CursorShape.SizeHorCursor if horizontal else Qt.CursorShape.SizeVerCursor if vertical else Qt.CursorShape.ArrowCursor
-        self.setCursor(cursor)
-        super().mouseMoveEvent(event)
+        if edges:
+            self.setCursor(cursor)
+        else:
+            self.unsetCursor()  # Do not leak an edge-resize cursor into children.
+
+    def eventFilter(self, watched, event):
+        if isinstance(watched, QWidget) and watched.window() is self:
+            if event.type() in (QEvent.Type.MouseMove, QEvent.Type.Enter):
+                if hasattr(event, "globalPosition"):
+                    self.update_resize_cursor(self.mapFromGlobal(event.globalPosition().toPoint()))
+            elif watched is self and event.type() in (QEvent.Type.Leave, QEvent.Type.WindowDeactivate):
+                self.unsetCursor()
+        return super().eventFilter(watched, event)
 
     def changeEvent(self, event):
         if event.type() == QEvent.Type.WindowStateChange:
-            margin = 0 if self.isMaximized() else 4
+            self.unsetCursor()
+            margin = 0 if self.isMaximized() or self.isFullScreen() else 4
             self.setContentsMargins(margin, margin, margin, margin)
             self.titlebar.update()
         super().changeEvent(event)

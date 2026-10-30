@@ -7,7 +7,6 @@ import numpy as np
 
 from splatoon_audio_converter import core
 from splatoon_audio_converter.preview import waveform
-from splatoon_audio_converter.updates import parse_release, version
 from fixtures import bars, pcm_bwav, replacement_wav
 
 
@@ -140,17 +139,6 @@ class CoreTests(unittest.TestCase):
             reread = core.BarsDocument(target)
             self.assertAlmostEqual(reread.tracks[0].duration, .7)
             self.assertEqual(reread.tracks[0].loop_end, reread.tracks[0].sample_count)
-
-    def test_updates_are_validated_and_read_only(self):
-        with self.assertRaises(ValueError):
-            version("latest")
-        self.assertIsNone(parse_release({"tag_name": "v1.0.0"}))
-        self.assertIsNone(parse_release({"tag_name": "v9.0.0", "prerelease": True}))
-        with self.assertRaises(ValueError):
-            parse_release({"tag_name": "v9.0.0", "html_url": "https://example.com/download"})
-        release = parse_release({"tag_name": "v9.0.0", "html_url": "https://github.com/qrazyi/splatoon-audio-converter/releases/tag/v9.0.0"})
-        self.assertEqual(release.version, "v9.0.0")
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

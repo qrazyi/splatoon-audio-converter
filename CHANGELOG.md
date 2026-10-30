@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.3.0
+
+- Glass-inspired translucent panels, reflective edges and pill-shaped controls.
+- Renamed Settings to Themes and sorted all choices alphabetically: Beige,
+  Blue, Brown (new default), Green, Orange, Purple and Yellow.
+- Migrated old Navy Blue preferences to Blue without discarding other choices.
+- Removed the Audio Levels panel, GitHub button and the complete update checker.
+- Corrected resize-cursor inheritance when maximizing, entering fullscreen,
+  moving into controls or leaving the window.
+- Moved audio feeding off the GUI thread, with a high-priority precise-timer
+  worker and 200 ms buffering to prevent covered-window playback starvation.
+- Added real-device hidden-window and blocked-UI playback regression checks.
+
 ## 2.2.0
 
 - Settings button with Beige (default), Navy Blue, Brown, Purple and Green themes.

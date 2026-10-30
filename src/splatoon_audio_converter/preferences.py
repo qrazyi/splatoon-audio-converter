@@ -12,6 +12,8 @@ class AppearanceSettings:
     @property
     def theme(self):
         value = self.store.value("theme", DEFAULT_THEME)
+        if value == "Navy Blue":
+            return "Blue"
         return value if value in PALETTES else DEFAULT_THEME
 
     def save_theme(self, name):

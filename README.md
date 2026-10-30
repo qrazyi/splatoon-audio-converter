@@ -2,7 +2,7 @@
 
 Extract WAVs, replace audio tracks or preview sounds.
 
-A standalone desktop app with five themes, rounded controls and a
+A standalone desktop app with seven glass-inspired themes, rounded controls and a
 three-column audio workbench. The visual arrangement was inspired by
 [HoianViewer](https://github.com/nvnprogram/HoianViewer), but its UI code, fonts,
 artwork and game assets have not been copied into this project.
@@ -12,7 +12,7 @@ artwork and game assets have not been copied into this project.
 
 ![Audio workbench](docs/preview.png)
 
-The preview shows the default Beige theme and an optional user-supplied font. Public downloads use the system
+The preview shows the default Brown theme and an optional user-supplied font. Public downloads use the system
 font unless you supply your own; Nintendo font software is not redistributed.
 
 ## Windows download
@@ -49,15 +49,22 @@ Preview volume defaults to 100% and supports 0–300% (up to +9.54 dB). Gain cha
 are applied to small audio buffers in real time, without stopping the track,
 reopening files, rewriting WAVs or refreshing the waveform. Short gain ramps
 reduce clicks. Loud sounds may clip. This does not
-change original files, extracted WAVs, saved replacements or the displayed
-measurements of the source track.
+change original files, extracted WAVs or saved replacements. Audio feeding runs
+on a dedicated high-priority thread with a precise timer and a 200 ms buffer,
+independent of UI focus, painting and covered/hidden windows.
 
 ### Appearance settings
 
-Open **Settings** to choose **Beige**, **Navy Blue**, **Brown**, **Purple** or
-**Green**. Beige is the default for a fresh install. Your choice is remembered
+Open **Themes** to choose **Beige**, **Blue**, **Brown**, **Green**, **Orange**,
+**Purple** or **Yellow**, sorted alphabetically. Brown is the default for a fresh
+install. Your choice is remembered
 between launches. It changes the whole interface, including the title bar,
 window controls, waveform, menus and buttons.
+
+The interface uses translucent layered panels, reflective rims and pill-shaped
+controls inspired by glass materials. This is an original Qt implementation,
+not Apple's native Liquid Glass framework. Previously saved Navy Blue
+preferences are automatically treated as Blue; other explicit choices are kept.
 
 The themed title bar supports dragging and double-clicking to maximize/restore,
 with minimize, maximize/restore and close controls. Window borders can be dragged
@@ -97,25 +104,17 @@ Older BARS containing FWAV/FSTP tracks are read-only. FSTP is a short prefetch:
 its header can describe the whole song, but only the stored audio can be extracted.
 Replacement of audio with more than two channels is not supported.
 
-**Audio levels:** Peak is the loudest sample; Average is RMS volume. 0 dBFS is
-the maximum digital level; more-negative numbers are quieter. These readings
-are measurements, not automatic gain changes.
-
-## GitHub support
+## Downloads and source builds
 
 Configured project: https://github.com/qrazyi/splatoon-audio-converter
 
-- The **Check for Updates** button checks the latest public stable GitHub Release.
-  It asks before opening a newer release's download page. Nothing is silently
-  downloaded, installed, or executed. This rebuild currently uses manual
-  installation rather than the older EXE-replacement updater.
-- The GitHub button opens the source repository and its releases/issue reports.
+- The application contains no GitHub button, updater or network requests.
+  Download and extract a newer portable release manually when you want one.
 - `.github/workflows/build.yml` tests, builds and privacy-checks the Windows app.
   Normal pushes/PRs produce downloadable build artifacts. A pushed `v*` tag
   additionally publishes a GitHub Release with the portable ZIP and checksum.
 
-The repository must be public/readable and have a release for anonymous update
-checks to work. Before a release, review the included third-party notices and
+Before a release, review the included third-party notices and
 bump both the package version in
 `pyproject.toml` and `src/splatoon_audio_converter/__init__.py`.
 
@@ -154,8 +153,8 @@ unless you have obtained permission to redistribute that font.
 
 No author machine paths are hardcoded in the application. File labels and
 activity messages show filenames, not the full local path. No telemetry is
-implemented; audio is never uploaded. Network access occurs only when the user
-checks GitHub or opens a GitHub link. Temporary previews are cleaned on close.
+implemented; audio is never uploaded. The app operates offline and makes no
+update checks or other network requests. Temporary previews are cleaned on close.
 
 Release checking scans normal files and decompressed frozen Python code for
 personal user-profile paths, and rejects all profile paths in application code.

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 import tempfile
 import time
@@ -10,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, QTimer, QUrl, Signal, Slot, QRectF
-from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
@@ -19,7 +18,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget, QAbstractItemView,
 )
 
-from . import __version__, updates
+from . import __version__
 from .core import BarsDocument, Track, bars_base_name, bars_zs_name, bfstm_name, bwav_name, read_pcm16
 from .preview import Preview, prepare
 from .fonts import configure
@@ -37,10 +36,6 @@ FILTERS = ("Splatoon audio (*.bars.zs *.bars *.bwav *.bwav.zs *.bfstm *.bfstm.zs
 def clock(seconds: float) -> str:
     ticks = round(max(0.0, seconds) * 100)
     return f"{ticks // 6000:02d}:{ticks // 100 % 60:02d}.{ticks % 100:02d}"
-
-
-def db(value: float) -> str:
-    return "Silent" if not math.isfinite(value) else f"{value:.1f} dBFS"
 
 
 def label(text: str, style: str = "", wrap: bool = False) -> QLabel:
@@ -104,28 +99,60 @@ class Panel(QFrame):
         if title:
             self.body.addWidget(label(title, "Section"))
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rim = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
+        lens = QPainterPath()
+        lens.addRoundedRect(rim, 22, 22)
+        p.setClipPath(lens)
+        sheen = QLinearGradient(0, 0, self.width() * .6, min(105, self.height()))
+        sheen.setColorAt(0, QColor(255, 255, 255, 27))
+        sheen.setColorAt(.5, QColor(255, 255, 255, 7))
+        sheen.setColorAt(1, QColor(255, 255, 255, 0))
+        p.fillPath(lens, sheen)
+        edge = QLinearGradient(0, 0, self.width(), self.height())
+        edge.setColorAt(0, QColor(255, 255, 255, 125))
+        edge.setColorAt(.35, QColor(255, 255, 255, 21))
+        edge.setColorAt(.72, QColor(255, 255, 255, 8))
+        edge.setColorAt(1, QColor(255, 255, 255, 60))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(edge, 1))
+        p.drawRoundedRect(rim, 22, 22)
+
 
 class Backdrop(QWidget):
-    """Subtle procedural audio-line motif, not copied game/viewer artwork."""
+    """Cached, softly lit backdrop underneath translucent glass-like panels."""
     def __init__(self):
         super().__init__()
         self.setObjectName("Backdrop")
+        self._glass_cache = None
+        self._glass_key = None
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        painter = QPainter(self)
         palette = active_palette()
-        painter.fillRect(self.rect(), QColor(palette.background))
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        motif = QColor(palette.accent)
-        motif.setAlpha(23)
-        painter.setPen(QPen(motif, 1.1))
-        for y in range(-30, self.height() + 50, 84):
-            path = QPainterPath()
-            path.moveTo(-20, y)
-            for x in range(-20, self.width() + 70, 70):
-                path.cubicTo(x + 15, y - 32, x + 40, y + 32, x + 70, y)
-            painter.drawPath(path)
+        key = (self.width(), self.height(), palette.background, palette.accent)
+        if key != self._glass_key:
+            self._glass_key = key
+            self._glass_cache = QPixmap(self.size())
+            painter = QPainter(self._glass_cache)
+            ground = QLinearGradient(0, 0, self.width(), self.height())
+            ground.setColorAt(0, QColor(blend(palette.background, palette.accent, .18)))
+            ground.setColorAt(.55, QColor(palette.background))
+            ground.setColorAt(1, QColor(blend(palette.background, "#000000", .15)))
+            painter.fillRect(self.rect(), ground)
+            for fx, fy, radius, alpha in ((.16, .14, .40, 50), (.90, .63, .48, 30), (.58, 1.0, .50, 22)):
+                light = QRadialGradient(self.width() * fx, self.height() * fy, self.width() * radius)
+                tint = QColor(palette.accent)
+                tint.setAlpha(alpha)
+                light.setColorAt(0, tint)
+                light.setColorAt(1, QColor(255, 255, 255, 0))
+                painter.fillRect(self.rect(), light)
+            painter.end()
+        painter = QPainter(self)
+        painter.drawPixmap(0, 0, self._glass_cache)
 
 
 class Waveform(QWidget):
@@ -300,8 +327,8 @@ class MainWindow(ThemedWindow):
         title.addWidget(label("Extract WAVs, replace audio tracks or preview sounds.", "Muted"))
         header.addLayout(title)
         header.addStretch()
-        self.settings_button = button("Settings", lambda: None, "Link")
-        self.theme_menu = QMenu(self.settings_button)
+        self.themes_button = button("Themes", lambda: None, "Link")
+        self.theme_menu = QMenu(self.themes_button)
         self.theme_menu.addSection("Application theme")
         self.theme_actions = {}
         group = QActionGroup(self.theme_menu)
@@ -312,14 +339,8 @@ class MainWindow(ThemedWindow):
             group.addAction(action)
             action.triggered.connect(lambda checked=False, name=name: self.set_theme(name))
             self.theme_actions[name] = action
-        self.settings_button.setMenu(self.theme_menu)
-        header.addWidget(self.settings_button)
-        self.update_button = button("Check for Updates", self.check_updates, "Primary")
-        self.update_button.setToolTip("Check this app's latest GitHub release")
-        header.addWidget(self.update_button)
-        self.github_button = button("GitHub", lambda: QDesktopServices.openUrl(QUrl(updates.REPOSITORY_URL)), "Link")
-        self.github_button.setToolTip("Source code, downloads and issue reports")
-        header.addWidget(self.github_button)
+        self.themes_button.setMenu(self.theme_menu)
+        header.addWidget(self.themes_button)
         layout.addLayout(header)
 
         horizontal = QSplitter(Qt.Orientation.Horizontal)
@@ -515,17 +536,6 @@ class MainWindow(ThemedWindow):
         replace.body.addWidget(self.clear_button)
         column.addWidget(replace)
 
-        volume = Panel("AUDIO LEVELS")
-        self.peak_value = label("—")
-        self.rms_value = label("—")
-        grid = QGridLayout()
-        grid.addWidget(label("Peak", "Muted"), 0, 0)
-        grid.addWidget(self.peak_value, 0, 1)
-        grid.addWidget(label("Average", "Muted"), 1, 0)
-        grid.addWidget(self.rms_value, 1, 1)
-        volume.body.addLayout(grid)
-        volume.body.addWidget(label("0 dBFS is the maximum. More negative numbers are quieter. These readings do not change your audio.", "Tiny", True))
-        column.addWidget(volume)
         column.addStretch()
         scroll.setWidget(container)
         return scroll
@@ -569,7 +579,6 @@ class MainWindow(ThemedWindow):
         self.progress.setValue(0)
         track, document = self.current(), self.document
         self.open_button.setEnabled(not busy)
-        self.update_button.setEnabled(not busy)
         self.extract_all_button.setEnabled(bool(document) and not busy)
         self.extract_selected_button.setEnabled(bool(self.selected()) and not busy)
         writable = document and all(self.can_replace(t) for t in document.tracks)
@@ -684,8 +693,6 @@ class MainWindow(ThemedWindow):
                 self.wave.clear()
                 self.preview = self.current_preview_key = None
                 self.time_label.setText("00:00.00 / 00:00.00")
-                self.peak_value.setText("—")
-                self.rms_value.setText("—")
             self.set_busy(self.busy)
             return
         self.track_title.setText(track.name)
@@ -726,8 +733,6 @@ class MainWindow(ThemedWindow):
         self.stop()
         self.pending_play = play
         self.wave.clear("Preparing waveform…")
-        self.peak_value.setText("…")
-        self.rms_value.setText("…")
         cache = Path(self.preview_cache.name)
 
         def done(preview):
@@ -738,8 +743,6 @@ class MainWindow(ThemedWindow):
                 return
             self.preview, self.current_preview_key = preview, key
             self.wave.set_preview(preview)
-            self.peak_value.setText(db(preview.peak_db))
-            self.rms_value.setText(db(preview.average_db))
             self.player.setSource(QUrl.fromLocalFile(str(preview.path)))
             self.time_label.setText(f"00:00.00 / {clock(preview.duration)}")
             if self.pending_play:
@@ -895,22 +898,12 @@ class MainWindow(ThemedWindow):
             self.status.setText("●  File saved. Original unchanged.")
         self.run_job("Saving game audio…", lambda progress: document.build(output, progress), done)
 
-    def check_updates(self):
-        def done(release):
-            if not release:
-                self.log("You have the latest published version.")
-                QMessageBox.information(self, "Updates", "You have the latest published version.")
-            elif QMessageBox.question(self, "Update available", f"{release.version} is available. Open its GitHub download page?",
-                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(QUrl(release.url))
-        self.run_job("Checking GitHub Releases…", lambda _: updates.check(), done)
-
     def about(self):
         QMessageBox.information(self, APP_NAME,
             f"{APP_NAME}\nVersion {__version__}\n\nExtract WAVs, replace audio tracks or preview sounds.\n\n"
             "Visual layout inspired by HoianViewer by nvnprogram.\nThe interface is independently implemented; no viewer assets are included.\n\n"
             "Audio: NumPy, Zstandard and VGAudio. Interface/playback: Qt for Python.\n"
-            "GitHub update checks are manual. Audio files are never uploaded.")
+            "The app works offline. Audio files are never uploaded.")
 
     def dragEnterEvent(self, event):
         if not self.busy and event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):
@@ -933,6 +926,7 @@ class MainWindow(ThemedWindow):
             return
         self.player.stop()
         self.player.setSource(QUrl())
+        self.player.shutdown()
         self.preview_cache.cleanup()
         event.accept()
 

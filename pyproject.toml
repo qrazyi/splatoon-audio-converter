@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "splatoon-audio-converter"
-version = "2.2.0"
+version = "2.3.0"
 description = "Extract WAVs, replace audio tracks or preview sounds."
 requires-python = ">=3.11"
 license = "MIT"
