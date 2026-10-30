@@ -1,5 +1,7 @@
 """Muted real-device test including hidden windows and a blocked GUI thread."""
 from pathlib import Path
+import argparse
+import subprocess
 import tempfile
 import time
 from unittest.mock import patch
@@ -10,10 +12,13 @@ from PySide6.QtWidgets import QApplication
 from splatoon_audio_converter.fonts import configure
 from splatoon_audio_converter.preferences import AppearanceSettings
 from splatoon_audio_converter.ui import MainWindow
-from fixtures import pcm_bwav
+from fixtures import pcm_bwav, replacement_wav
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--bfstm-channels", type=int, choices=(1, 2, 4, 6, 8, 10, 32))
+    args = parser.parse_args()
     app = QApplication([])
     if QMediaDevices.defaultAudioOutput().isNull():
         print("SKIP: no real output device; deterministic worker and GUI tests cover this runner.")
@@ -22,6 +27,12 @@ def main():
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "Playback_Check.bwav"
         path.write_bytes(pcm_bwav(seconds=3.5))
+        if args.bfstm_channels:
+            wav = Path(folder) / "generated.wav"
+            replacement_wav(wav, seconds=3.5, rate=48000, channels=args.bfstm_channels)
+            path = Path(folder) / "Playback_Check.bfstm"
+            fixture_tool = Path(__file__).resolve().parents[1] / "test-output/make_test_stream.exe"
+            subprocess.run([str(fixture_tool), str(wav), str(path)], check=True, capture_output=True)
         window = MainWindow(AppearanceSettings(Path(folder) / "theme.ini"))
         window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
         window.show()

@@ -2,11 +2,15 @@ from pathlib import Path
 import tempfile
 import unittest
 import time
+import wave
+from unittest.mock import patch
+
+import numpy as np
 
 from PySide6.QtCore import QCoreApplication, QObject, QUrl, Signal
-from PySide6.QtMultimedia import QAudio, QMediaPlayer
+from PySide6.QtMultimedia import QAudio, QAudioFormat, QMediaPlayer
 from fixtures import replacement_wav
-from splatoon_audio_converter.playback import PreviewPlayer, _PlaybackEngine
+from splatoon_audio_converter.playback import PreviewPlayer, _PlaybackEngine, preview_pcm
 
 
 class FakeDevice:
@@ -23,6 +27,7 @@ class FakeSink(QObject):
 
     def __init__(self, format, parent):
         super().__init__(parent)
+        self.format = format
         self.starts = self.resets = 0
         self.elapsed = 0
         self._state = QAudio.State.StoppedState
@@ -124,3 +129,50 @@ class PlaybackTests(unittest.TestCase):
             finally:
                 player.shutdown()
             self.assertFalse(player._thread.isRunning())
+
+    def test_multichannel_music_plays_first_stereo_pair_without_changing_file(self):
+        for channels in (4, 6, 8, 10, 32):
+            with self.subTest(channels=channels), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder) / "music.wav"
+                pcm = np.tile(np.arange(channels, dtype="<i2") * 1000, (1024, 1))
+                with wave.open(str(path), "wb") as writer:
+                    writer.setnchannels(channels)
+                    writer.setsampwidth(2)
+                    writer.setframerate(48000)
+                    writer.writeframes(pcm.tobytes())
+                original = path.read_bytes()
+                player = _PlaybackEngine(sink_factory=FakeSink)
+                try:
+                    player.setSource(QUrl.fromLocalFile(str(path)))
+                    player.play()
+                    self.assertEqual(player._sink.format.channelCount(), 2)
+                    self.assertEqual(bytes(player._sink.device.data), pcm[:, :2].tobytes())
+                    self.assertEqual(player.playbackState(), QMediaPlayer.PlaybackState.PlayingState)
+                finally:
+                    player.setSource(QUrl())
+                self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(preview_pcm(b"\x01\x00\x02\x00", 1), b"\x01\x00\x02\x00")
+
+    def test_float_only_output_uses_float_pcm(self):
+        class FloatDevice:
+            def isNull(self): return False
+            def isFormatSupported(self, format):
+                return format.sampleFormat() == QAudioFormat.SampleFormat.Float
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "preview.wav"
+            replacement_wav(path, channels=4)
+            player = _PlaybackEngine()
+            with patch("splatoon_audio_converter.playback.QMediaDevices.defaultAudioOutput", return_value=FloatDevice()), \
+                 patch("splatoon_audio_converter.playback.QAudioSink", side_effect=lambda device, format, parent: FakeSink(format, parent)):
+                try:
+                    player.setSource(QUrl.fromLocalFile(str(path)))
+                    player.play()
+                    self.assertEqual(player._sink.format.sampleFormat(), QAudioFormat.SampleFormat.Float)
+                    samples = np.frombuffer(player._sink.device.data, dtype="<f4").reshape(-1, 2)
+                    self.assertEqual(len(samples), 512)
+                    self.assertTrue(np.all(np.isfinite(samples)))
+                    self.assertLessEqual(float(np.abs(samples).max()), 1)
+                    self.assertGreater(float(np.abs(samples).max()), .1)
+                finally:
+                    player.setSource(QUrl())

@@ -1,0 +1,34 @@
+SPLATOON AUDIO CONVERTER
+Extract WAVs, replace audio tracks or preview sounds.
+
+GET STARTED
+Extract the entire ZIP, then open Splatoon Audio Converter.exe.
+Keep the _internal folder next to the EXE. Do not run it from inside the ZIP.
+
+1. Open an audio file.
+2. Select a track to listen to.
+3. Choose a replacement .wav file.
+4. Save as a new file. Your original files are not affected.
+
+FILES AND PLAYBACK
+Supports .bars, .bars.zs, .bwav, .bwav.zs, .bfstm and .bfstm.zs.
+Click Play to listen, the circular arrow to replay, or the waveform to seek.
+Preview volume supports 0-300%; louder settings may clip.
+Multichannel music previews its first stereo pair. Extraction keeps all channels.
+Replacement WAVs must be mono/stereo, uncompressed 16-bit PCM.
+Replacing streams with more than two channels is not supported.
+Older BARS containing FWAV/FSTP sounds are preview/extract only.
+
+REQUIREMENTS
+Windows 10/11, 64-bit, and an audio output device for listening.
+Python, FFmpeg apps, Switch Toolbox and other converters are not needed.
+Nintendo audio helpers need Microsoft .NET Framework 4.8, normally included
+with current Windows installations. If missing, install it from Microsoft:
+https://dotnet.microsoft.com/download/dotnet-framework/net48
+
+PRIVACY AND LICENSES
+Works offline. No accounts, updater, telemetry or audio uploads.
+No personal settings, paths, logs, fonts or game audio are included.
+Only your theme choice is saved locally; previews are temporary.
+Keep LICENSE, THIRD_PARTY_NOTICES.md and _internal/licenses with the app.
+This project is not affiliated with or endorsed by Nintendo.

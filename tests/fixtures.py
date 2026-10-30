@@ -41,10 +41,11 @@ def bars(names=("Preview_Chime", "Preview_Confirm", "Preview_Loop")):
     return bytes(output)
 
 
-def replacement_wav(path: Path, seconds=.5, rate=44100):
+def replacement_wav(path: Path, seconds=.5, rate=44100, channels=1):
     pcm = np.rint(np.sin(np.arange(round(seconds * rate)) / rate * 660 * 2 * np.pi) * 9000).astype("<i2")
+    pcm = np.repeat(pcm[:, None], channels, axis=1)
     with wave.open(str(path), "wb") as output:
-        output.setnchannels(1)
+        output.setnchannels(channels)
         output.setsampwidth(2)
         output.setframerate(rate)
         output.writeframes(pcm.tobytes())

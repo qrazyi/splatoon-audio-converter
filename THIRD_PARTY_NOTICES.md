@@ -12,6 +12,10 @@ Its ownership/terms are not changed by this project's MIT license.
 
 Runtime components:
 
+- **Python runtime** — Python Software Foundation and contributors.
+  Its license and included historical/third-party notices are shipped in
+  `licenses/Python/LICENSE.txt` inside the runtime folder.
+  Source: https://github.com/python/cpython
 - **Qt for Python / PySide6, Shiboken and Qt** — The Qt Company and contributors.
   LGPLv3/GPLv3/commercial licensing as applicable to the selected modules.
   Source: https://code.qt.io/pyside/pyside-setup.git
@@ -31,6 +35,9 @@ Runtime components:
   Source: https://github.com/facebook/zstd
 - **FFmpeg libraries supplied with Qt Multimedia** — see the Qt package's
   FFmpeg notices and applicable LGPL license. Source: https://ffmpeg.org/
+- **charset-normalizer**, when collected by the build — MIT license; its
+  notice is included in the runtime licenses folder.
+  Source: https://github.com/jawah/charset_normalizer
 
 The build script collects the installed packages' license/notice files into the
 portable download. Do not remove those files when redistributing the app.

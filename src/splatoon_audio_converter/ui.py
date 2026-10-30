@@ -24,7 +24,7 @@ from .preview import Preview, prepare
 from .fonts import configure
 from .playback import PreviewPlayer
 from .preferences import AppearanceSettings
-from .theme import PALETTES, active_palette, apply_theme, blend
+from .theme import DEFAULT_THEME, PALETTES, active_palette, apply_theme, blend
 from .window_chrome import ThemedWindow
 
 APP_NAME = "Splatoon Audio Converter"
@@ -790,7 +790,12 @@ class MainWindow(ThemedWindow):
 
     def playback_error(self, error, message):
         if error != QMediaPlayer.Error.NoError and hasattr(self, "activity"):
-            self.log("Audio playback could not start. Try another sound or check the output device.")
+            if "No audio output is available" in message:
+                self.log("No audio output found. Connect headphones or speakers and try again.")
+            elif "does not support this sample rate" in message:
+                self.log("This audio output cannot play the track's sample rate. Try another output device.")
+            else:
+                self.log("Audio playback could not start. Try another sound or check the output device.")
 
     def assign_replacement(self):
         track = self.current()
@@ -927,12 +932,22 @@ def main():
     parser = argparse.ArgumentParser(description=APP_NAME)
     parser.add_argument("file", nargs="?", type=Path)
     parser.add_argument("--snapshot", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--test-playback", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.test_playback and not args.snapshot:
+        parser.error("--test-playback requires --snapshot")
     app = QApplication(sys.argv[:1])
     app.setApplicationName(APP_NAME)
     app.setOrganizationName("SplatoonAudioConverter")
-    configure(app)
-    window = MainWindow()
+    # Release checks must neither depend on nor alter the builder's preferences.
+    snapshot_settings = tempfile.TemporaryDirectory(prefix="audio-app-check-") if args.snapshot else None
+    settings = AppearanceSettings(Path(snapshot_settings.name) / "theme.ini") if snapshot_settings else None
+    configure(app, DEFAULT_THEME if args.snapshot else None)
+    window = MainWindow(settings) if settings else MainWindow()
+    playback_errors = []
+    if args.test_playback:
+        window.audio.setMuted(True)
+        window.player.errorOccurred.connect(lambda error, message: playback_errors.append(error))
     if args.snapshot:
         if not args.file:
             parser.error("A file is required for --snapshot")
@@ -943,8 +958,25 @@ def main():
     if args.snapshot:
         deadline = time.monotonic() + 30
         timer = QTimer(window)
+        started = False
         def capture():
+            nonlocal started
+            if playback_errors:
+                timer.stop()
+                window.close()
+                app.exit(2)
+                return
             if window.document and window.preview and not window.busy:
+                if args.test_playback:
+                    if not started:
+                        window.player.play()
+                        started = True
+                    if window.player._engine.bytes_streamed == 0:
+                        if time.monotonic() > deadline:
+                            timer.stop()
+                            window.close()
+                            app.exit(3)
+                        return
                 args.snapshot.parent.mkdir(parents=True, exist_ok=True)
                 success = window.grab().save(str(args.snapshot))
                 timer.stop()
@@ -955,7 +987,10 @@ def main():
                 app.exit(1)
         timer.timeout.connect(capture)
         timer.start(100)
-    sys.exit(app.exec())
+    code = app.exec()
+    if snapshot_settings:
+        snapshot_settings.cleanup()
+    sys.exit(code)
 
 
 if __name__ == "__main__":

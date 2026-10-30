@@ -23,6 +23,18 @@ def amplify(pcm: bytes, channels: int, current: float, target: float, rate: int)
     return np.clip(np.rint(samples), -32768, 32767).astype("<i2").tobytes(), float(ramp[-1])
 
 
+def preview_pcm(pcm: bytes, channels: int) -> bytes:
+    """Nintendo music stores stereo layers, not a speaker-surround mix.
+
+    Audition the first stereo pair rather than sending 4–32 channels to an
+    ordinary output device or stacking alternate music layers on top of it.
+    This changes only the playback buffer, never the source or extracted WAV.
+    """
+    if channels <= 2:
+        return pcm
+    return np.frombuffer(pcm, dtype="<i2").reshape(-1, channels)[:, :2].copy().tobytes()
+
+
 class PreviewOutput:
     def __init__(self):
         self._volume = 1.0
@@ -61,6 +73,7 @@ class _PlaybackEngine(QObject):
         self._pending = b""
         self._eof = self._resetting = False
         self._gain = 1.0
+        self._sample_format = QAudioFormat.SampleFormat.Int16
         self.underruns = 0
         self.bytes_streamed = 0
         self._timer = QTimer(self)
@@ -150,15 +163,21 @@ class _PlaybackEngine(QObject):
     def _create_sink(self):
         format = QAudioFormat()
         format.setSampleRate(self._reader.getframerate())
-        format.setChannelCount(self._reader.getnchannels())
+        format.setChannelCount(min(2, self._reader.getnchannels()))
         format.setSampleFormat(QAudioFormat.SampleFormat.Int16)
         if self._sink_factory:
             sink = self._sink_factory(format, self)
         else:
             device = QMediaDevices.defaultAudioOutput()
-            if device.isNull() or not device.isFormatSupported(format):
-                raise ValueError("The output device does not support this audio format.")
+            if device.isNull():
+                raise ValueError("No audio output is available. Connect headphones or speakers and try again.")
+            if not device.isFormatSupported(format):
+                # Some Windows devices expose only floating-point PCM.
+                format.setSampleFormat(QAudioFormat.SampleFormat.Float)
+                if not device.isFormatSupported(format):
+                    raise ValueError("The audio output does not support this sample rate. Try another output device.")
             sink = QAudioSink(device, format, self)
+        self._sample_format = format.sampleFormat()
         # The old 40 ms GUI-fed queue underruns when Windows occludes the UI.
         # A dedicated precise-timer thread and 200 ms queue tolerate background
         # scheduling delays without depending on repaint or window events.
@@ -225,12 +244,16 @@ class _PlaybackEngine(QObject):
         if not self._device or self._state != QMediaPlayer.PlaybackState.PlayingState:
             return
         free = self._sink.bytesFree()
-        channels, rate = self._reader.getnchannels(), self._reader.getframerate()
-        if not self._pending and not self._eof and free >= channels * 2:
-            frames = min(free // (channels * 2), 4096)
-            pcm = self._reader.readframes(frames)
+        source_channels, rate = self._reader.getnchannels(), self._reader.getframerate()
+        channels = min(2, source_channels)
+        frame_bytes = channels * (4 if self._sample_format == QAudioFormat.SampleFormat.Float else 2)
+        if not self._pending and not self._eof and free >= frame_bytes:
+            frames = min(free // frame_bytes, 4096)
+            pcm = preview_pcm(self._reader.readframes(frames), source_channels)
             target = 0.0 if self.output.isMuted() else self.output.volume()
             self._pending, self._gain = amplify(pcm, channels, self._gain, target, rate)
+            if self._sample_format == QAudioFormat.SampleFormat.Float:
+                self._pending = (np.frombuffer(self._pending, dtype="<i2").astype("<f4") / 32768).tobytes()
             self._eof = self._reader.tell() >= self._reader.getnframes()
         if self._pending and free:
             written = self._device.write(self._pending[:free])

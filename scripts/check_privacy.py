@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import io
 import marshal
 import re
+import zipfile
 from pathlib import Path
 
 PROFILE = re.compile(r"(?:[a-z]:/+users/|/(?:users|home)/)([^/\s\x00\"']{2,})", re.I)
@@ -32,6 +34,16 @@ def matches(data, *, own_code=False, ci=False):
     return personal_hit or bool(names - UPSTREAM_EXAMPLES)
 
 
+def payloads(name, data):
+    """Include compressed Python libraries, not just visible byte strings."""
+    yield name, data
+    if name.lower().endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            for entry in archive.infolist():
+                if not entry.is_dir():
+                    yield from payloads(name + "!" + entry.filename, archive.read(entry))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path)
@@ -43,11 +55,12 @@ def main():
         if not path.is_file():
             continue
         raw = path.read_bytes()
-        own = path.suffix.lower() in (".py", ".pyw")
-        if matches(raw, own_code=own, ci=args.ci):
-            failures.append(path.relative_to(args.target).as_posix())
-        elif profile_names(raw):
-            upstream_files += 1
+        for name, data in payloads(path.relative_to(args.target).as_posix(), raw):
+            own = name.lower().endswith((".py", ".pyw"))
+            if matches(data, own_code=own, ci=args.ci):
+                failures.append(name)
+            elif profile_names(data):
+                upstream_files += 1
         if path.suffix.lower() == ".exe" and path.name == "Splatoon Audio Converter.exe":
             from PyInstaller.archive.readers import CArchiveReader
             reader = CArchiveReader(str(path))

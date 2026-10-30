@@ -34,7 +34,9 @@ jobs:
       - name: Check continuous playback and live volume changes
         env:
           PYTHONPATH: src
-        run: python tests/smoke_playback.py
+        run: |
+          python tests/smoke_playback.py
+          python tests/smoke_playback.py --bfstm-channels 10
       - name: Build portable application
         run: python -m PyInstaller --noconfirm 'Splatoon Audio Converter.spec'
       - name: Verify the packaged executable
@@ -43,6 +45,8 @@ jobs:
         run: python scripts/check_privacy.py dist --ci
       - name: Bundle release
         run: python scripts/package_release.py
+      - name: Test final ZIP from a fresh folder without development paths
+        run: python scripts/smoke_frozen.py --zip dist/Splatoon-Audio-Converter-win-x64.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Splatoon-Audio-Converter-win-x64

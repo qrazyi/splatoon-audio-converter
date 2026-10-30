@@ -109,6 +109,9 @@ Extraction uses the original track, not an assigned replacement WAV.
 
 Older BARS containing FWAV/FSTP tracks are read-only. FSTP is a short prefetch:
 its header can describe the whole song, but only the stored audio can be extracted.
+Multichannel BFSTM music plays its first stereo pair, not a sum of its alternate
+music layers. The waveform matches that audible pair. Extracted WAVs retain
+all original channels. Floating-point-only audio outputs are also supported.
 Replacement of audio with more than two channels is not supported.
 
 ## Downloads and source builds
@@ -143,16 +146,18 @@ python -m PyInstaller --noconfirm "Splatoon Audio Converter.spec"
 python scripts/smoke_frozen.py
 python scripts/check_privacy.py dist
 python scripts/package_release.py
+python scripts/smoke_frozen.py --zip dist/Splatoon-Audio-Converter-win-x64.zip
 ```
 
 If an older local build is running, use a separate output directory so its
 loaded libraries are not replaced:
 
 ```powershell
-python -m PyInstaller --noconfirm --distpath dist/v2.4.0 "Splatoon Audio Converter.spec"
-python scripts/smoke_frozen.py --dist-dir dist/v2.4.0
-python scripts/check_privacy.py dist/v2.4.0
-python scripts/package_release.py --dist-dir dist/v2.4.0
+python -m PyInstaller --noconfirm --distpath dist/v2.4.1 "Splatoon Audio Converter.spec"
+python scripts/smoke_frozen.py --dist-dir dist/v2.4.1
+python scripts/check_privacy.py dist/v2.4.1
+python scripts/package_release.py --dist-dir dist/v2.4.1
+python scripts/smoke_frozen.py --zip dist/v2.4.1/Splatoon-Audio-Converter-win-x64.zip
 ```
 
 The build uses the included MIT-licensed `VGAudio.dll`; the helper source code is
@@ -163,8 +168,11 @@ only and are not bundled with the app.
 The packaging script also creates a clean source ZIP, excluding local build logs,
 caches and generated test output. Use that ZIP when sharing source outside Git.
 Private development fonts in `local-assets` are excluded from Git and source ZIPs.
-The build can bundle a local font for personal use, but never upload such a build
-unless you have obtained permission to redistribute that font.
+Public builds exclude local fonts by default, even when installed on the build
+machine. An explicitly private build can opt in with `SAC_INCLUDE_PRIVATE_FONT=1`,
+but the release packager rejects such a build to prevent accidental redistribution.
+The end-user ZIP includes only the executable/runtime, `START HERE.txt`, and
+required licenses/notices. The long developer README stays in the source package.
 
 ## Privacy and redistribution
 

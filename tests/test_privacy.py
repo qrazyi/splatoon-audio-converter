@@ -1,6 +1,8 @@
 import importlib.util
+import io
 from pathlib import Path
 import unittest
+import zipfile
 
 spec = importlib.util.spec_from_file_location("check_privacy", Path(__file__).resolve().parents[1] / "scripts/check_privacy.py")
 privacy = importlib.util.module_from_spec(spec)
@@ -14,7 +16,7 @@ class PrivacyTests(unittest.TestCase):
             self.assertTrue(privacy.matches(data))
 
     def test_application_cannot_embed_upstream_examples(self):
-        value = ("C:" + "/Users/qt/work/build.pdb").encode()
+        value = ("C:" + "/Users/" + "qt/work/build.pdb").encode()
         self.assertFalse(privacy.matches(value))
         self.assertTrue(privacy.matches(value, own_code=True))
 
@@ -24,6 +26,14 @@ class PrivacyTests(unittest.TestCase):
 
     def test_portable_relative_names_pass(self):
         self.assertFalse(privacy.matches(b"splatoon_audio_converter/ui.py", own_code=True))
+
+    def test_compressed_libraries_are_scanned_after_decompression(self):
+        stream = io.BytesIO()
+        private = ("C:" + "/Users/" + Path.home().name + "/Desktop/private").encode()
+        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("module.pyc", private)
+        entries = dict(privacy.payloads("base_library.zip", stream.getvalue()))
+        self.assertTrue(privacy.matches(entries["base_library.zip!module.pyc"]))
 
 
 if __name__ == "__main__":

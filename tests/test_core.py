@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from splatoon_audio_converter import core
-from splatoon_audio_converter.preview import waveform
+from splatoon_audio_converter.preview import waveform, prepare
 from fixtures import bars, pcm_bwav, replacement_wav
 
 
@@ -139,6 +139,35 @@ class CoreTests(unittest.TestCase):
             reread = core.BarsDocument(target)
             self.assertAlmostEqual(reread.tracks[0].duration, .7)
             self.assertEqual(reread.tracks[0].loop_end, reread.tracks[0].sample_count)
+
+    @unittest.skipUnless(__import__("sys").platform == "win32", "Bundled helper is Windows-only")
+    def test_multichannel_bfstm_and_compressed_bfstm_preview_preserve_all_extracted_channels(self):
+        import wave
+        fixture_tool = Path(__file__).resolve().parents[1] / "test-output/make_test_stream.exe"
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for channels in (2, 4, 6, 8, 10):
+                wav, source = root / "generated.wav", root / "music.bfstm"
+                replacement_wav(wav, seconds=.15, channels=channels)
+                subprocess.run([str(fixture_tool), str(wav), str(source)], check=True, capture_output=True)
+                raw = source.read_bytes()
+                for compressed in (False, True):
+                    with self.subTest(channels=channels, compressed=compressed):
+                        path = root / ("music.bfstm.zs" if compressed else "music.bfstm")
+                        path.write_bytes(core.Zstd().compress(raw) if compressed else raw)
+                        document = core.BarsDocument(path)
+                        self.assertEqual(document.tracks[0].channels, channels)
+                        cache = root / f"cache-{channels}-{compressed}"
+                        cache.mkdir()
+                        preview = prepare(document, document.tracks[0], cache, False)
+                        self.assertAlmostEqual(preview.duration, .15)
+                        with wave.open(str(preview.path), "rb") as reader:
+                            self.assertEqual(reader.getnchannels(), channels)
+                        output = cache / "extracted"
+                        document.extract(document.tracks, output)
+                        with wave.open(str(next(output.glob("*.wav"))), "rb") as reader:
+                            self.assertEqual(reader.getnchannels(), channels)
+                        self.assertEqual(core.read_archive(path), raw)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

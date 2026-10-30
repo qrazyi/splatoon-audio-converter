@@ -33,7 +33,9 @@ def waveform(path: Path, bins: int = 1200) -> tuple[np.ndarray, float, float, fl
         peaks = np.zeros(bins, dtype=np.float32)
         peak, squares, count, frame_offset = 0.0, 0.0, 0, 0
         while chunk := source.readframes(65536):
-            pcm = np.frombuffer(chunk, dtype="<i2").reshape(-1, channels).astype(np.float64)
+            # Match playback: multichannel Nintendo music uses alternate stereo
+            # layers. Show the first pair rather than inaudible extra layers.
+            pcm = np.frombuffer(chunk, dtype="<i2").reshape(-1, channels)[:, :2].astype(np.float64)
             magnitudes = np.max(np.abs(pcm), axis=1)
             indices = np.minimum((np.arange(len(pcm)) + frame_offset) * bins // frames, bins - 1)
             np.maximum.at(peaks, indices, magnitudes / 32768.0)

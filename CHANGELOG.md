@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.1
+
+- Fixed BFSTM playback on ordinary stereo devices: multichannel Nintendo music
+  previews its first stereo layer instead of requesting unsupported 4–32-channel
+  hardware output. The waveform follows the audible pair; extraction is unchanged.
+- Added floating-point PCM output for devices without 16-bit output support.
+- Tested raw/compressed BFSTM, multichannel decoding, playback, extraction and
+  stereo replacement, alongside the existing BARS/BWAV checks.
+- Public builds omit private fonts even when present on the build machine.
+- Downloads contain one short start guide plus essential license notices, not
+  development READMEs, personal settings, logs, test sounds or local files.
+- Added public-package rejection checks and fresh-ZIP executable tests with
+  development Python/Qt paths removed from the environment.
+
 ## 2.4.0
 
 - Reverted Liquid Glass styling to the original opaque rounded-panel interface.
