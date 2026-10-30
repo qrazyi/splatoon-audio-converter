@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "windows" if sys.platform == "win32" el
 
 from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtGui import QFont
-from PySide6.QtCore import Qt, QCoreApplication, QEvent, QPointF
+from PySide6.QtCore import Qt, QCoreApplication, QEvent, QPoint, QPointF
 from PySide6.QtMultimedia import QMediaDevices, QMediaPlayer
 from splatoon_audio_converter.ui import MainWindow
 from splatoon_audio_converter.fonts import configure
@@ -38,7 +38,7 @@ def until(app, condition, timeout=5):
 
 def main():
     app = QApplication([])
-    configure(app, "Brown")
+    configure(app, "Dorfic")
     preferences_folder = tempfile.TemporaryDirectory()
     window = MainWindow(AppearanceSettings(Path(preferences_folder.name) / "appearance.ini"))
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
@@ -56,7 +56,7 @@ def main():
         assert window.table.item(0, 2).text() == "00:00.32"
         assert window.preview and window.preview.duration == .32
         assert window.themes_button.text() == "Themes"
-        assert window.theme_name == "Brown"
+        assert window.theme_name == "Dorfic"
         assert not hasattr(window, "update_button") and not hasattr(window, "github_button")
         assert not hasattr(window, "check_updates")
         assert not window.findChildren(__import__("PySide6.QtWidgets", fromlist=["QMenuBar"]).QMenuBar)
@@ -112,7 +112,15 @@ def main():
             assert window.theme_name == name
             assert window.preferences.theme == name
             assert window.grab().save(str(output / ("theme-" + name.lower().replace(" ", "-") + ".png")))
-        window.set_theme("Brown")
+        window.set_theme("Dorfic")
+        menu = window.theme_menu
+        menu.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        menu.popup(QPoint(30, 30))
+        app.processEvents()
+        assert not menu.mask().contains(QPoint(0, 0))
+        assert menu.mask().contains(menu.rect().center())
+        assert menu.grab().save(str(output / "theme-menu.png"))
+        menu.hide()
         assert window.titlebar.caption.text() == "Splatoon Audio Converter"
         window.update_resize_cursor(QPointF(1, 1))
         assert window.cursor().shape() == Qt.CursorShape.SizeFDiagCursor
@@ -144,7 +152,7 @@ def main():
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         app.processEvents()
     preferences_folder.cleanup()
-    print("PASS: glass UI, seven sorted themes, Brown default, removed controls, asynchronous playback and fullscreen/interior cursor recovery.")
+    print("PASS: opaque UI, five exact gradient themes, Dorfic default, rounded native theme popup, audio controls and fullscreen cursor recovery.")
 
 
 if __name__ == "__main__":

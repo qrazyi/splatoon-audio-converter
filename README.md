@@ -2,7 +2,7 @@
 
 Extract WAVs, replace audio tracks or preview sounds.
 
-A standalone desktop app with seven glass-inspired themes, rounded controls and a
+A standalone desktop app with five themes, opaque panels, rounded controls and a
 three-column audio workbench. The visual arrangement was inspired by
 [HoianViewer](https://github.com/nvnprogram/HoianViewer), but its UI code, fonts,
 artwork and game assets have not been copied into this project.
@@ -12,7 +12,7 @@ artwork and game assets have not been copied into this project.
 
 ![Audio workbench](docs/preview.png)
 
-The preview shows the default Brown theme and an optional user-supplied font. Public downloads use the system
+The preview shows the default Dorfic theme and an optional user-supplied font. Public downloads use the system
 font unless you supply your own; Nintendo font software is not redistributed.
 
 ## Windows download
@@ -55,16 +55,23 @@ independent of UI focus, painting and covered/hidden windows.
 
 ### Appearance settings
 
-Open **Themes** to choose **Beige**, **Blue**, **Brown**, **Green**, **Orange**,
-**Purple** or **Yellow**, sorted alphabetically. Brown is the default for a fresh
+Open **Themes** to choose **Aqua**, **Beige**, **Dark Aero**, **Dorfic** or **Eco**,
+sorted alphabetically. Dorfic is the default for a fresh
 install. Your choice is remembered
 between launches. It changes the whole interface, including the title bar,
 window controls, waveform, menus and buttons.
 
-The interface uses translucent layered panels, reflective rims and pill-shaped
-controls inspired by glass materials. This is an original Qt implementation,
-not Apple's native Liquid Glass framework. Previously saved Navy Blue
-preferences are automatically treated as Blue; other explicit choices are kept.
+The original opaque rounded-panel styling is restored; the Liquid Glass effects
+are removed. The theme dropdown has rounded native-window corners and rounded
+menu items. The accent gradients use these exact endpoints:
+
+- Aqua: `#66e2f2` → `#6676f2`
+- Dark Aero: `#1c1c1c` → `#4f4f4f`, with those colors also used for its background/surface
+- Dorfic: `#f07902` → `#fbcc11`
+- Eco: `#4ae072` → `#4ce6a3`
+
+Beige keeps its previous warm palette. A saved theme that has been removed now
+falls back to Dorfic; a saved Beige preference remains unchanged.
 
 The themed title bar supports dragging and double-clicking to maximize/restore,
 with minimize, maximize/restore and close controls. Window borders can be dragged
@@ -136,6 +143,16 @@ python -m PyInstaller --noconfirm "Splatoon Audio Converter.spec"
 python scripts/smoke_frozen.py
 python scripts/check_privacy.py dist
 python scripts/package_release.py
+```
+
+If an older local build is running, use a separate output directory so its
+loaded libraries are not replaced:
+
+```powershell
+python -m PyInstaller --noconfirm --distpath dist/v2.4.0 "Splatoon Audio Converter.spec"
+python scripts/smoke_frozen.py --dist-dir dist/v2.4.0
+python scripts/check_privacy.py dist/v2.4.0
+python scripts/package_release.py --dist-dir dist/v2.4.0
 ```
 
 The build uses the included MIT-licensed `VGAudio.dll`; the helper source code is

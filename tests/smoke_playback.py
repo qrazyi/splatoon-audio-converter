@@ -18,7 +18,7 @@ def main():
     if QMediaDevices.defaultAudioOutput().isNull():
         print("SKIP: no real output device; deterministic worker and GUI tests cover this runner.")
         return
-    configure(app, "Brown")
+    configure(app, "Dorfic")
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "Playback_Check.bwav"
         path.write_bytes(pcm_bwav(seconds=3.5))

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4.0
+
+- Reverted Liquid Glass styling to the original opaque rounded-panel interface.
+- Replaced themes with Aqua, Beige, Dark Aero, Dorfic (default) and Eco, sorted
+  alphabetically, using the requested exact two-color gradient endpoints.
+- Rounded the theme dropdown's native popup shape as well as its menu items.
+- Removed theme preferences fall back to Dorfic; saved Beige remains available.
+- Kept the offline UI, 300% volume, background-audio worker and fullscreen fixes.
+
 ## 2.3.0
 
 - Glass-inspired translucent panels, reflective edges and pill-shaped controls.

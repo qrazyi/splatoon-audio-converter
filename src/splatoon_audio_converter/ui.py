@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, QTimer, QUrl, Signal, Slot, QRectF
-from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient
+from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QIcon, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QRegion
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
@@ -86,7 +86,10 @@ def playback_icon(shape="play", color=None):
         arrow.closeSubpath()
         painter.drawPath(arrow)
     painter.end()
-    return QIcon(pixmap)
+    icon = QIcon(pixmap)
+    icon.addPixmap(pixmap, QIcon.Mode.Selected)
+    icon.addPixmap(pixmap, QIcon.Mode.Active)
+    return icon
 
 
 class Panel(QFrame):
@@ -99,60 +102,49 @@ class Panel(QFrame):
         if title:
             self.body.addWidget(label(title, "Section"))
 
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rim = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
-        lens = QPainterPath()
-        lens.addRoundedRect(rim, 22, 22)
-        p.setClipPath(lens)
-        sheen = QLinearGradient(0, 0, self.width() * .6, min(105, self.height()))
-        sheen.setColorAt(0, QColor(255, 255, 255, 27))
-        sheen.setColorAt(.5, QColor(255, 255, 255, 7))
-        sheen.setColorAt(1, QColor(255, 255, 255, 0))
-        p.fillPath(lens, sheen)
-        edge = QLinearGradient(0, 0, self.width(), self.height())
-        edge.setColorAt(0, QColor(255, 255, 255, 125))
-        edge.setColorAt(.35, QColor(255, 255, 255, 21))
-        edge.setColorAt(.72, QColor(255, 255, 255, 8))
-        edge.setColorAt(1, QColor(255, 255, 255, 60))
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.setPen(QPen(edge, 1))
-        p.drawRoundedRect(rim, 22, 22)
+
+class RoundedThemeMenu(QMenu):
+    """Round the native popup window itself as well as its styled contents."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+
+    def update_rounding(self):
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 14, 14)
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.update_rounding()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_rounding()
 
 
 class Backdrop(QWidget):
-    """Cached, softly lit backdrop underneath translucent glass-like panels."""
+    """Original opaque backdrop with a subtle procedural audio-line motif."""
     def __init__(self):
         super().__init__()
         self.setObjectName("Backdrop")
-        self._glass_cache = None
-        self._glass_key = None
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        palette = active_palette()
-        key = (self.width(), self.height(), palette.background, palette.accent)
-        if key != self._glass_key:
-            self._glass_key = key
-            self._glass_cache = QPixmap(self.size())
-            painter = QPainter(self._glass_cache)
-            ground = QLinearGradient(0, 0, self.width(), self.height())
-            ground.setColorAt(0, QColor(blend(palette.background, palette.accent, .18)))
-            ground.setColorAt(.55, QColor(palette.background))
-            ground.setColorAt(1, QColor(blend(palette.background, "#000000", .15)))
-            painter.fillRect(self.rect(), ground)
-            for fx, fy, radius, alpha in ((.16, .14, .40, 50), (.90, .63, .48, 30), (.58, 1.0, .50, 22)):
-                light = QRadialGradient(self.width() * fx, self.height() * fy, self.width() * radius)
-                tint = QColor(palette.accent)
-                tint.setAlpha(alpha)
-                light.setColorAt(0, tint)
-                light.setColorAt(1, QColor(255, 255, 255, 0))
-                painter.fillRect(self.rect(), light)
-            painter.end()
         painter = QPainter(self)
-        painter.drawPixmap(0, 0, self._glass_cache)
+        palette = active_palette()
+        painter.fillRect(self.rect(), QColor(palette.background))
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        motif = QColor(palette.accent)
+        motif.setAlpha(23)
+        painter.setPen(QPen(motif, 1.1))
+        for y in range(-30, self.height() + 50, 84):
+            path = QPainterPath()
+            path.moveTo(-20, y)
+            for x in range(-20, self.width() + 70, 70):
+                path.cubicTo(x + 15, y - 32, x + 40, y + 32, x + 70, y)
+            painter.drawPath(path)
 
 
 class Waveform(QWidget):
@@ -204,7 +196,7 @@ class Waveform(QWidget):
         for i, index in enumerate(indices):
             x = area.left() + area.width() * i / max(1, count - 1)
             height = max(1.5, float(self.peaks[index]) * area.height() * .45)
-            p.setPen(QPen(QColor(blend(palette.accent, palette.text, .65)) if i / max(1, count) <= self.position else QColor(palette.accent), 1.5))
+            p.setPen(QPen(QColor(blend(palette.marker, palette.text, .65)) if i / max(1, count) <= self.position else QColor(palette.marker), 1.5))
             p.drawLine(round(x), round(area.center().y() - height), round(x), round(area.center().y() + height))
         x = area.left() + self.position * area.width()
         p.setPen(QPen(QColor(palette.text), 1.3))
@@ -279,10 +271,10 @@ class MainWindow(ThemedWindow):
         palette = active_palette()
         self.playback_changed(self.player.playbackState())
         self.restart_button.setIcon(playback_icon("restart", palette.text))
-        row_icon = playback_icon("play", palette.accent)
+        row_icon = playback_icon("play", palette.marker)
         for row in range(self.table.rowCount()):
             self.table.item(row, 0).setIcon(row_icon)
-            self.table.item(row, 0).setForeground(QColor(palette.accent))
+            self.table.item(row, 0).setForeground(QColor(palette.marker))
             self.table.item(row, 5).setForeground(QColor(palette.text))
         self.wave.update()
         self.titlebar.update()
@@ -328,7 +320,7 @@ class MainWindow(ThemedWindow):
         header.addLayout(title)
         header.addStretch()
         self.themes_button = button("Themes", lambda: None, "Link")
-        self.theme_menu = QMenu(self.themes_button)
+        self.theme_menu = RoundedThemeMenu(self.themes_button)
         self.theme_menu.addSection("Application theme")
         self.theme_actions = {}
         group = QActionGroup(self.theme_menu)
@@ -661,8 +653,8 @@ class MainWindow(ThemedWindow):
                 if col in (0, 2):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if col == 0:
-                    item.setIcon(playback_icon("play", active_palette().accent))
-                    item.setForeground(QColor(active_palette().accent))
+                    item.setIcon(playback_icon("play", active_palette().marker))
+                    item.setForeground(QColor(active_palette().marker))
                     item.setToolTip("Preview this track")
                 self.table.setItem(row, col, item)
         self.table.blockSignals(False)

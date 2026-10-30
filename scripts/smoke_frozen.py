@@ -1,5 +1,6 @@
 """Verify the actual portable Windows executable opens generated audio."""
 from pathlib import Path
+import argparse
 import subprocess
 import sys
 
@@ -9,13 +10,16 @@ from fixtures import bars
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dist-dir", type=Path, default=ROOT / "dist")
+    args = parser.parse_args()
     output = ROOT / "test-output"
     output.mkdir(exist_ok=True)
     sound = output / "Preview_Sounds.bars"
     sound.write_bytes(bars(("Preview_Chime", "Preview_Confirm", "Preview_Loop",
                             "Preview_Notification", "Preview_Scroll", "Preview_Start")))
     picture = output / "packaged.png"
-    executable = ROOT / "dist/Splatoon Audio Converter/Splatoon Audio Converter.exe"
+    executable = args.dist_dir.resolve() / "Splatoon Audio Converter/Splatoon Audio Converter.exe"
     result = subprocess.run([str(executable), str(sound), "--snapshot", str(picture)],
                             capture_output=True, text=True, timeout=45,
                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
