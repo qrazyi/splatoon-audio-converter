@@ -1,15 +1,14 @@
 # Portable Windows folder build. Dynamic Qt libraries stay replaceable on disk.
 from pathlib import Path
 import importlib.metadata
-import os
 import sys
 
 root = Path(SPECPATH)
 notices = []
-local_fonts = []
-font = root / 'local-assets/NinDev-Treasure_00.ttf'
-if os.environ.get('SAC_INCLUDE_PRIVATE_FONT') == '1' and font.is_file():
-    local_fonts.append((str(font), 'splatoon_audio_converter/assets/fonts'))
+font = root / 'src/splatoon_audio_converter/assets/fonts/NinDev-Treasure_00.ttf'
+if not font.is_file():
+    raise RuntimeError('The supplied interface font is missing; restore it before building.')
+bundled_fonts = [(str(font), 'splatoon_audio_converter/assets/fonts')]
 for dependency in ('numpy', 'zstandard', 'PySide6_Essentials', 'PySide6_Addons', 'shiboken6'):
     distribution = importlib.metadata.distribution(dependency)
     for entry in distribution.files or []:
@@ -34,7 +33,7 @@ a = Analysis(
     pathex=[str(root / 'src')],
     binaries=[],
     datas=[(str(root / 'src/splatoon_audio_converter/native'), 'splatoon_audio_converter/native'),
-           (str(root / 'licenses'), 'licenses')] + notices + local_fonts,
+           (str(root / 'licenses'), 'licenses')] + notices + bundled_fonts,
     hiddenimports=['PySide6.QtMultimedia'],
     excludes=['tkinter', 'PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets',
               'PySide6.QtQml', 'PySide6.QtQuick', 'PySide6.QtPdf', 'PySide6.Qt3DCore'],

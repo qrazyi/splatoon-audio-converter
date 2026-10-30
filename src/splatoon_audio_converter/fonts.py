@@ -1,4 +1,4 @@
-"""Load an optional, user-supplied font without storing its original location."""
+"""Load the supplied interface font without storing its original location."""
 from pathlib import Path
 import sys
 

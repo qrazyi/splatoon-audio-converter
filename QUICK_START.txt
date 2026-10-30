@@ -28,7 +28,8 @@ https://dotnet.microsoft.com/download/dotnet-framework/net48
 
 PRIVACY AND LICENSES
 Works offline. No accounts, updater, telemetry or audio uploads.
-No personal settings, paths, logs, fonts or game audio are included.
+No personal settings, paths, logs or game audio are included.
+The supplied interface font is included; its original ownership/terms still apply.
 Only your theme choice is saved locally; previews are temporary.
-Keep LICENSE, THIRD_PARTY_NOTICES.md and _internal/licenses with the app.
+Keep the _internal folder, including its license notices, with the app.
 This project is not affiliated with or endorsed by Nintendo.

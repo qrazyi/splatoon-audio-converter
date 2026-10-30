@@ -1,13 +1,12 @@
-# Optional interface font
+# Interface font
 
-The supplied Nintendo font is not licensed for redistribution by this project.
-It is deliberately excluded from Git and public releases.
+The supplied NinDev-Treasure_00.ttf font is now bundled with the app in
+`src/splatoon_audio_converter/assets/fonts` and included in portable releases.
+Its original copyright/terms remain unchanged; the project's MIT code license
+does not relicense the font.
 
-If you have permission to use it, put your own `NinDev-Treasure_00.ttf` here
-(the `fonts` folder beside the application executable), then restart the app.
-Otherwise the app uses the system font. Original font paths are never stored.
+No separate font installation is needed. Original font paths are never stored.
+The app falls back to the system font if it cannot load the supplied font.
 
-For private development, `local-assets/NinDev-Treasure_00.ttf` is also detected.
-That directory is ignored by Git and is excluded from the clean source ZIP.
-Local builds can bundle that private copy; do not upload those builds publicly
-unless you have obtained the required redistribution permission.
+Other private development files in `local-assets` remain ignored by Git and
+excluded from release ZIPs.

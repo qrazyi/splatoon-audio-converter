@@ -1,6 +1,7 @@
 """Verify the actual portable Windows executable opens generated audio."""
 from pathlib import Path
 import argparse
+import hashlib
 import os
 import subprocess
 import sys
@@ -17,6 +18,10 @@ from splatoon_audio_converter.core import Zstd
 
 
 def verify(executable, output, cwd):
+    supplied = ROOT / "src/splatoon_audio_converter/assets/fonts/NinDev-Treasure_00.ttf"
+    bundled = executable.parent / "_internal/splatoon_audio_converter/assets/fonts/NinDev-Treasure_00.ttf"
+    if not bundled.is_file() or hashlib.sha256(bundled.read_bytes()).digest() != hashlib.sha256(supplied.read_bytes()).digest():
+        raise RuntimeError("The supplied interface font is missing or has changed in the portable app.")
     app = QCoreApplication.instance() or QCoreApplication([])
     playback = not QMediaDevices.defaultAudioOutput().isNull()
     cases = []

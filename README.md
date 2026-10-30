@@ -12,8 +12,8 @@ artwork and game assets have not been copied into this project.
 
 ![Audio workbench](docs/preview.png)
 
-The preview shows the default Dorfic theme and an optional user-supplied font. Public downloads use the system
-font unless you supply your own; Nintendo font software is not redistributed.
+The preview shows the default Dorfic theme and the supplied NinDev-Treasure
+interface font, now included in the app. No separate font installation is needed.
 
 ## Windows download
 
@@ -83,11 +83,12 @@ Replacement WAV selector lets you compare them. Sample rate and channel count
 are matched to the original when saving. BARS exports as `.bars.zs`; standalone
 music keeps its BWAV/BFSTM format and original compression choice.
 
-### Optional custom font
+### Interface font
 
-If its terms permit your use, put your own `NinDev-Treasure_00.ttf` in the `fonts`
-folder beside the EXE, then restart. The font is optional and is not uploaded or
-included in public releases. See [fonts/README.md](fonts/README.md).
+The supplied `NinDev-Treasure_00.ttf` is bundled as a runtime asset and included in
+source builds, so the appearance is consistent across computers. Its original
+copyright/terms are separate from the application's MIT code license.
+Original font locations are never stored. See [fonts/README.md](fonts/README.md).
 
 ### Keyboard shortcuts
 
@@ -153,11 +154,11 @@ If an older local build is running, use a separate output directory so its
 loaded libraries are not replaced:
 
 ```powershell
-python -m PyInstaller --noconfirm --distpath dist/v2.4.1 "Splatoon Audio Converter.spec"
-python scripts/smoke_frozen.py --dist-dir dist/v2.4.1
-python scripts/check_privacy.py dist/v2.4.1
-python scripts/package_release.py --dist-dir dist/v2.4.1
-python scripts/smoke_frozen.py --zip dist/v2.4.1/Splatoon-Audio-Converter-win-x64.zip
+python -m PyInstaller --noconfirm --distpath dist/v2.4.2 "Splatoon Audio Converter.spec"
+python scripts/smoke_frozen.py --dist-dir dist/v2.4.2
+python scripts/check_privacy.py dist/v2.4.2
+python scripts/package_release.py --dist-dir dist/v2.4.2
+python scripts/smoke_frozen.py --zip dist/v2.4.2/Splatoon-Audio-Converter-win-x64.zip
 ```
 
 The build uses the included MIT-licensed `VGAudio.dll`; the helper source code is
@@ -167,12 +168,12 @@ only and are not bundled with the app.
 
 The packaging script also creates a clean source ZIP, excluding local build logs,
 caches and generated test output. Use that ZIP when sharing source outside Git.
-Private development fonts in `local-assets` are excluded from Git and source ZIPs.
-Public builds exclude local fonts by default, even when installed on the build
-machine. An explicitly private build can opt in with `SAC_INCLUDE_PRIVATE_FONT=1`,
-but the release packager rejects such a build to prevent accidental redistribution.
-The end-user ZIP includes only the executable/runtime, `START HERE.txt`, and
-required licenses/notices. The long developer README stays in the source package.
+Other private development files in `local-assets` are excluded from Git and ZIPs.
+Only the explicitly supplied interface font is included; packaging verifies that
+it matches the source asset and rejects other fonts/settings/logs.
+The end-user ZIP opens with just the executable and `_internal` folder. It has
+no START HERE or top-level documentation. Required license notices are retained
+under `_internal/licenses`; the developer README stays in the source package.
 
 ## Privacy and redistribution
 

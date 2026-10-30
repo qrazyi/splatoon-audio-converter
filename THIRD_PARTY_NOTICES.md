@@ -5,10 +5,11 @@ three-panel arrangement were inspired by HoianViewer by nvnprogram:
 https://github.com/nvnprogram/HoianViewer
 
 No HoianViewer source code, fonts, textures, logos, or game assets are included.
-No Nintendo game files are distributed. Test sounds are generated mathematically.
-The optional Nintendo-owned NinDev-Treasure font is not part of the public
-source or releases. Users may supply their own copy if permitted by its terms.
-Its ownership/terms are not changed by this project's MIT license.
+No game audio, models or effects are distributed. Test sounds are generated mathematically.
+The NinDev-Treasure_00.ttf interface font was supplied by the project owner and
+is bundled as requested. Its original copyright and terms remain with its owner;
+the project's MIT license covers the application code, not this font. Inclusion
+does not establish or change the font's redistribution rights.
 
 Runtime components:
 

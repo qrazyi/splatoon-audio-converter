@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.2
+
+- Restored the supplied interface font in the app, source builds and portable ZIP.
+- Packaging permits only that exact font at its runtime asset location; other
+  private fonts, settings, logs, personal paths and game audio remain excluded.
+- Release tests now fail if the supplied font is missing from the download.
+- Removed START HERE and top-level license/notice files from the portable ZIP;
+  required notices now live under `_internal/licenses/application`.
+- Kept the BFSTM playback fix and all existing audio/theme fixes.
+
 ## 2.4.1
 
 - Fixed BFSTM playback on ordinary stereo devices: multichannel Nintendo music
