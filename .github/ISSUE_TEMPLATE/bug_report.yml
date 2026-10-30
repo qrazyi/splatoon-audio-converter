@@ -1,0 +1,25 @@
+name: Bug report
+description: Report a problem with the audio converter
+body:
+  - type: markdown
+    attributes:
+      value: "Please do not upload game files, copyrighted fonts, personal folder paths or unredacted private information."
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Press F1 in the app to see its version.
+    validations:
+      required: true
+  - type: input
+    id: format
+    attributes:
+      label: Audio file type
+      placeholder: .bars, .bars.zs, .bwav or .bfstm
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Explain the steps, expected result and actual result. Use filenames only, not personal paths.
+    validations:
+      required: true

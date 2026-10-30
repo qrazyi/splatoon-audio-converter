@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "splatoon-audio-converter"
+version = "2.1.0"
+description = "Extract WAVs, replace audio tracks or preview sounds."
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["numpy>=1.26,<3", "PySide6==6.12.0", "zstandard==0.25.0"]
+
+[project.scripts]
+splatoon-audio-converter = "splatoon_audio_converter.ui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+splatoon_audio_converter = ["native/*.exe", "native/*.dll"]

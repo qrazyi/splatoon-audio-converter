@@ -1,0 +1,66 @@
+name: Test and build desktop app
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install app and build dependencies
+        run: python -m pip install . pyinstaller
+      - name: Compile included audio helpers
+        run: python scripts/build_native.py
+      - name: Test audio engine
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Test and render desktop interface
+        env:
+          PYTHONPATH: src
+        run: python tests/smoke_ui.py
+      - name: Build portable application
+        run: python -m PyInstaller --noconfirm 'Splatoon Audio Converter.spec'
+      - name: Verify the packaged executable
+        run: python scripts/smoke_frozen.py
+      - name: Check release for personal paths
+        run: python scripts/check_privacy.py dist --ci
+      - name: Bundle release
+        run: python scripts/package_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Splatoon-Audio-Converter-win-x64
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            test-output/*.png
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Splatoon-Audio-Converter-win-x64
+          path: release
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" release/dist/*.zip release/dist/SHA256SUMS.txt --title "$RELEASE_TAG" --generate-notes
