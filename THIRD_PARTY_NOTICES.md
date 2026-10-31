@@ -1,16 +1,9 @@
 # Third-party notices
 
-## Version 3 lightweight app
-
-The native version in `native-app/` ships VGAudio (MIT), Zstandard (BSD) and the
-separately supplied interface font. Its required notices are under
-`_internal/licenses`; Windows supplies .NET Framework, Windows Forms and WinMM.
-It does not ship Python, Qt, NumPy or FFmpeg. See `native-app/licenses/NOTICES.txt`.
-
-## Archived version 2 implementation
-
-The following component list describes the earlier Python/Qt build, whose source
-is retained here for reference. Those runtime components are not part of v3.
+The supported download uses the original Qt/Python application. The smaller
+package omits unused FFmpeg video backends and QML/PDF/3D components; it retains
+Python, Qt Widgets/Multimedia's Windows PCM backend, NumPy and the supplied font.
+The unused `native-app/` experiment is not part of this download.
 
 The desktop interface is an original implementation. Its custom styling and
 three-panel arrangement were inspired by HoianViewer by nvnprogram:
@@ -46,8 +39,8 @@ Runtime components:
 - **python-zstandard / Zstandard** — BSD/MIT licenses as described by upstream.
   Source: https://github.com/indygreg/python-zstandard
   Source: https://github.com/facebook/zstd
-- **FFmpeg libraries supplied with Qt Multimedia** — see the Qt package's
-  FFmpeg notices and applicable LGPL license. Source: https://ffmpeg.org/
+- **FFmpeg** — not included in the smaller package. Existing complete Qt license
+  bundles may still contain notices for it. Source: https://ffmpeg.org/
 - **charset-normalizer**, when collected by the build — MIT license; its
   notice is included in the runtime licenses folder.
   Source: https://github.com/jawah/charset_normalizer

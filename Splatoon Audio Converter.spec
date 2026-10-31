@@ -4,6 +4,8 @@ import importlib.metadata
 import sys
 
 root = Path(SPECPATH)
+sys.path.insert(0, str(root / 'scripts'))
+from runtime_layout import omit_runtime
 notices = []
 font = root / 'src/splatoon_audio_converter/assets/fonts/NinDev-Treasure_00.ttf'
 if not font.is_file():
@@ -44,7 +46,8 @@ a = Analysis(
 # PATH can supply an incompatible ICU with the same name (e.g. Poppler's ICU).
 # Never redistribute those unversioned Windows system libraries from PATH.
 system_icu = {'icuuc.dll', 'icuin.dll', 'icudt.dll'}
-a.binaries = [entry for entry in a.binaries if Path(entry[0]).name.lower() not in system_icu]
+a.binaries = [entry for entry in a.binaries
+              if Path(entry[0]).name.lower() not in system_icu and not omit_runtime(entry[0])]
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True,
           name='Splatoon Audio Converter', console=False, icon='NONE',

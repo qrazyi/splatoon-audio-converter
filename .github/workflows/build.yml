@@ -1,8 +1,8 @@
-name: Test and build lightweight desktop app
+name: Test and build original desktop app
 
 on:
   push:
-    branches: [main, master, codex/native-v3-rework]
+    branches: [main, master]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -13,28 +13,44 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: powershell
     steps:
       - uses: actions/checkout@v4
-      - name: Build codec without an external Visual C++ runtime
-        run: .\native-app\build-codec.ps1
-      - name: Build lightweight native application
-        run: .\native-app\build.ps1
-      - name: Test audio engine, playback and themes
-        run: .\native-app\test.ps1 -SkipBuild
-      - name: Package, privacy-check and enforce the 20 MiB size limit
-        run: .\native-app\package.ps1
-      - name: Test final ZIP without development runtimes
-        run: .\native-app\smoke.ps1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install original application and build dependencies
+        run: python -m pip install . pyinstaller
+      - name: Build audio helpers
+        run: python scripts/build_native.py
+      - name: Test audio engine and packaging rules
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Test original interface, theme menu and playback
+        env:
+          PYTHONPATH: src
+        run: |
+          python tests/smoke_ui.py
+          python tests/smoke_playback.py
+          python tests/smoke_playback.py --bfstm-channels 10
+      - name: Build the original app without unused optional libraries
+        run: python -m PyInstaller --noconfirm 'Splatoon Audio Converter.spec'
+      - name: Verify portable executable
+        run: python scripts/smoke_frozen.py
+      - name: Scan for personal paths
+        run: python scripts/check_privacy.py dist --ci
+      - name: Package release
+        run: python scripts/package_release.py
+      - name: Test ZIP from a fresh folder without development paths
+        run: python scripts/smoke_frozen.py --zip dist/Splatoon-Audio-Converter-win-x64.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Splatoon-Audio-Converter-win-x64
           path: |
-            native-app/dist/*.zip
-            native-app/dist/SHA256SUMS.txt
-            native-app/test-output/*.png
+            dist/*.zip
+            dist/SHA256SUMS.txt
+            test-output/*.png
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'
@@ -52,4 +68,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" release/dist/*.zip release/dist/SHA256SUMS.txt --title "$RELEASE_TAG" --generate-notes
+        run: gh release create "$RELEASE_TAG" release/dist/*.zip release/dist/SHA256SUMS.txt --title "$RELEASE_TAG" --generate-notes --latest

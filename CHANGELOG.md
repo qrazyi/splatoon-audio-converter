@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.4.2 smaller repack — supported version
+
+- Restored the exact original v2.4.2 interface and audio engine. The native v3
+  rewrite is no longer the supported/recommended version.
+- Repacked the existing working folder without rebuilding or changing the EXE,
+  custom font, UI code, layout, controls, themes or audio helpers.
+- Removed unused optional video/PDF/QML/virtual-keyboard/3D components and orphan
+  ICU data: roughly 45 MB download instead of 84 MB. Expanded size is about 116 MB.
+- Verified every retained file byte-for-byte against the untouched baseline,
+  tested all audio formats from a fresh ZIP, and tested the live theme menu.
+- Applied the same conservative exclusions to future original-interface builds.
+
 ## 3.0.0
 
 - Rebuilt the main Windows app with lightweight native controls, GDI+ waveform

@@ -1,9 +1,9 @@
 # Interface font
 
 The supplied NinDev-Treasure_00.ttf font is stored in
-`src/splatoon_audio_converter/assets/fonts`. Version 3 embeds it in the EXE for
-normal themes. Legacy uses only the Windows system font. Earlier v2 portable
-builds included it as a separate runtime asset.
+`src/splatoon_audio_converter/assets/fonts`. The supported original-interface
+build includes it as a runtime asset, unchanged from v2.4.2. Repacking does not
+remove or replace it.
 Its original copyright/terms remain unchanged; the project's MIT code license
 does not relicense the font.
 
