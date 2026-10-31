@@ -10,6 +10,9 @@ spec.loader.exec_module(privacy)
 
 
 class PrivacyTests(unittest.TestCase):
+    def test_native_executable_does_not_need_pyinstaller_reader(self):
+        self.assertFalse(privacy.is_pyinstaller(b"MZ managed executable"))
+        self.assertTrue(privacy.is_pyinstaller(b"MZ data MEI\x0c\x0b\x0a\x0b\x0e archive"))
     def test_personal_paths_ascii_escaped_and_utf16(self):
         value = "C:" + "\\Users\\" + Path.home().name + "\\Desktop\\private.txt"
         for data in (value.encode(), value.replace("\\", "\\\\").encode(), value.encode("utf-16-le")):

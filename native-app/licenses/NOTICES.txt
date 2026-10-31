@@ -1,0 +1,19 @@
+Splatoon Audio Converter 3
+
+This Windows desktop app uses the operating system's .NET Framework 4.8,
+Windows Forms, GDI+ and WinMM audio APIs. No Python, NumPy, Qt or FFmpeg
+runtimes are bundled. No network, updater or telemetry features are included.
+
+VGAudio: MIT. https://github.com/Thealexbarney/VGAudio
+Zstandard: BSD. https://github.com/facebook/zstd
+Keep the accompanying notices with the application.
+The codec is compiled with a static C runtime; no separate Visual C++ runtime
+installation is required. See build-codec.ps1 for the pinned-source rebuild.
+
+The supplied NinDev-Treasure interface font is embedded for the normal themes.
+Its original copyright and terms remain separate from this app's MIT code
+license. Legacy uses the Windows system font instead.
+
+UI arrangement inspired by HoianViewer by nvnprogram:
+https://github.com/nvnprogram/HoianViewer
+No HoianViewer code is included.

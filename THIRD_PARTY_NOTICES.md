@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Version 3 lightweight app
+
+The native version in `native-app/` ships VGAudio (MIT), Zstandard (BSD) and the
+separately supplied interface font. Its required notices are under
+`_internal/licenses`; Windows supplies .NET Framework, Windows Forms and WinMM.
+It does not ship Python, Qt, NumPy or FFmpeg. See `native-app/licenses/NOTICES.txt`.
+
+## Archived version 2 implementation
+
+The following component list describes the earlier Python/Qt build, whose source
+is retained here for reference. Those runtime components are not part of v3.
+
 The desktop interface is an original implementation. Its custom styling and
 three-panel arrangement were inspired by HoianViewer by nvnprogram:
 https://github.com/nvnprogram/HoianViewer

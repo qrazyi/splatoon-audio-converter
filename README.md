@@ -2,36 +2,28 @@
 
 Extract WAVs, replace audio tracks or preview sounds.
 
-A standalone desktop app with five themes, opaque panels, rounded controls and a
-three-column audio workbench. The visual arrangement was inspired by
-[HoianViewer](https://github.com/nvnprogram/HoianViewer), but its UI code, fonts,
-artwork and game assets have not been copied into this project.
+Version 3 rebuilds the desktop app using Windows Forms, a lightweight waveform
+renderer and Windows audio output. The portable folder is about **1 MB**, not
+80 MB. Both the download and extracted app are checked against a **20 MiB limit**.
+No Python, NumPy, Qt, FFmpeg or web-browser runtime is bundled or required.
 
-[Download the latest release](https://github.com/qrazyi/splatoon-audio-converter/releases/latest)
+[Download](https://github.com/qrazyi/splatoon-audio-converter/releases/latest)
 · [Report an issue](https://github.com/qrazyi/splatoon-audio-converter/issues)
 
-![Audio workbench](docs/preview.png)
+![Dorfic theme](docs/preview.png)
 
-The preview shows the default Dorfic theme and the supplied NinDev-Treasure
-interface font, now included in the app. No separate font installation is needed.
+## Run
 
-## Windows download
+Extract the entire ZIP and open **Splatoon Audio Converter.exe**. Keep its small
+`_internal` folder beside it. There is no installer, updater, GitHub button,
+telemetry or network access. The app does not need administrator privileges.
 
-Extract the **complete portable folder**, then run **Splatoon Audio Converter.exe**.
-Keep `_internal` beside the EXE; it contains the audio, playback and UI libraries.
-There is no installer and the title contains no version number.
+Windows 10/11 **x64** with **.NET Framework 4.8** is required. It is already part
+of most current Windows installations; install Microsoft's runtime if missing.
+The download relies on that Windows runtime to stay small. It is not a
+self-contained runtime bundle or a macOS/Linux application.
 
-Windows 10/11 x64 is the supported build. Python, FFmpeg applications, Switch
-Toolbox, a game ROMFS and a separate media player are not required. The small
-Nintendo audio helpers use Windows .NET Framework 4.x; install Microsoft's .NET
-Framework 4.8 runtime if a Windows installation does not already provide it.
-Qt playback libraries, NumPy, Zstandard and VGAudio are included in the download.
-
-The UI and pure Python engine can be developed on other systems, but the bundled
-Nintendo stream/conversion helpers are currently Windows-only. This is **not**
-advertised as a fully supported macOS/Linux release.
-
-## Work with audio
+## Use
 
 1. Open an audio file
 2. Select a track to listen to
@@ -40,157 +32,92 @@ advertised as a fully supported macOS/Linux release.
 
 Your original files are not affected.
 
-Supported files: `.bars`, `.bars.zs`, `.bwav`, `.bwav.zs`, `.bfstm`, `.bfstm.zs`.
-Drag and drop also works. To preview audio, click a track's play icon or the large
-play/pause button. The circular-arrow button immediately replays from the start,
-even when paused. Click the waveform to seek.
+Supported inputs: `.bars`, `.bars.zs`, `.bwav`, `.bwav.zs`, `.bfstm`, `.bfstm.zs`.
+Drag/drop, track filtering, duration/channel details, waveform seeking,
+play/pause, immediate restart, extraction and replacement previews are included.
+Extraction creates **WAVs only**, never a manifest or sidecar JSON.
 
-Preview volume defaults to 100% and supports 0–300% (up to +9.54 dB). Gain changes
-are applied to small audio buffers in real time, without stopping the track,
-reopening files, rewriting WAVs or refreshing the waveform. Short gain ramps
-reduce clicks. Loud sounds may clip. This does not
-change original files, extracted WAVs or saved replacements. Audio feeding runs
-on a dedicated high-priority thread with a precise timer and a 200 ms buffer,
-independent of UI focus, painting and covered/hidden windows.
+Replacement WAVs must be uncompressed **16-bit PCM**, mono or stereo. Sample
+rate and channel count are matched automatically. Existing loops retain their
+relative position. Preview volume supports **0–300%**, with smooth gain changes
+on a separate audio worker; it does not change saved/extracted audio. Boosting
+loud tracks can clip. Restart immediately starts playing again, even if paused.
 
-### Appearance settings
+BARS saves as `.bars.zs`. Standalone BWAV/BFSTM retains its format/compression.
+The extension is added once, even if the selected name already has it. The
+original input cannot be overwritten. Other existing output files require
+confirmation; saves are built and validated before replacing the destination.
 
-Open **Themes** to choose **Aqua**, **Beige**, **Dark Aero**, **Dorfic** or **Eco**,
-sorted alphabetically. Dorfic is the default for a fresh
-install. Your choice is remembered
-between launches. It changes the whole interface, including the title bar,
-window controls, waveform, menus and buttons.
+Multichannel audio previews its **first stereo pair**; extraction retains every
+channel. Tracks with more than two channels, old FWAV/FSTP entries and short
+prefetches are preview/extract-only. Their untouched bytes are kept when other
+editable tracks in the archive are replaced. Prefetches contain only the opening
+portion of a sound. BWAV PCM16 and DSP-ADPCM are supported, not BWAV Opus.
+Files/decompressed archives over 512 MB are rejected.
 
-The original opaque rounded-panel styling is restored; the Liquid Glass effects
-are removed. The theme dropdown has rounded native-window corners and rounded
-menu items. The accent gradients use these exact endpoints:
+Shortcuts: **Ctrl+O** open, **Space** play/pause, **Ctrl+R** restart,
+**Ctrl+Shift+S** save a new game-audio file.
 
-- Aqua: `#66e2f2` → `#6676f2`
-- Dark Aero: `#1c1c1c` → `#4f4f4f`, with those colors also used for its background/surface
-- Dorfic: `#f07902` → `#fbcc11`
-- Eco: `#4ae072` → `#4ce6a3`
+## Themes
 
-Beige keeps its previous warm palette. A saved theme that has been removed now
-falls back to Dorfic; a saved Beige preference remains unchanged.
+Themes are alphabetically ordered: **Aqua, Beige, Dark Aero, Dorfic, Eco, Legacy**.
+Dorfic remains the default. Normal themes keep the supplied interface font,
+rounded controls and the existing accent colors. Native Windows window controls
+handle resizing/maximizing; title-bar colors apply where supported by Windows.
 
-The themed title bar supports dragging and double-clicking to maximize/restore,
-with minimize, maximize/restore and close controls. Window borders can be dragged
-to resize. Appearance settings contain only the theme name, never audio paths,
-and are stored in your account's application settings, not beside game files.
+**Legacy** uses a plain **black background, white text, system font, flat controls,
+no gradients and no Quick Guide**. It restores a simple original-style workbench
+without installing a second app. It does not remove any audio functionality.
 
-For replacements, use a **mono/stereo 16-bit PCM WAV**. The Original sound /
-Replacement WAV selector lets you compare them. Sample rate and channel count
-are matched to the original when saving. BARS exports as `.bars.zs`; standalone
-music keeps its BWAV/BFSTM format and original compression choice.
+![Legacy theme](docs/legacy.png)
 
-### Interface font
+Only the theme name is remembered in the current user's registry settings.
+Audio paths, track lists, volume preferences and recent files are not saved.
 
-The supplied `NinDev-Treasure_00.ttf` is bundled as a runtime asset and included in
-source builds, so the appearance is consistent across computers. Its original
-copyright/terms are separate from the application's MIT code license.
-Original font locations are never stored. See [fonts/README.md](fonts/README.md).
+## Build / test
 
-### Keyboard shortcuts
-
-- Ctrl+O: open audio
-- Space: play/pause
-- Ctrl+R: immediately replay
-- Ctrl+Shift+S: save as a new game audio file
-- F1: about and version information
-
-### File handling
-
-The extension is added only once. The source file cannot be overwritten.
-Event names and metadata are retained. Loop behavior is preserved automatically;
-the original loop's relative position is adjusted to the replacement's length.
-There is no editable "loop system" to configure accidentally.
-
-Extraction produces WAVs only: no manifest, audit JSON or sidecar configuration.
-Extraction uses the original track, not an assigned replacement WAV.
-
-Older BARS containing FWAV/FSTP tracks are read-only. FSTP is a short prefetch:
-its header can describe the whole song, but only the stored audio can be extracted.
-Multichannel BFSTM music plays its first stereo pair, not a sum of its alternate
-music layers. The waveform matches that audible pair. Extracted WAVs retain
-all original channels. Floating-point-only audio outputs are also supported.
-Replacement of audio with more than two channels is not supported.
-
-## Downloads and source builds
-
-Configured project: https://github.com/qrazyi/splatoon-audio-converter
-
-- The application contains no GitHub button, updater or network requests.
-  Download and extract a newer portable release manually when you want one.
-- `.github/workflows/build.yml` tests, builds and privacy-checks the Windows app.
-  Normal pushes/PRs produce downloadable build artifacts. A pushed `v*` tag
-  additionally publishes a GitHub Release with the portable ZIP and checksum.
-
-Before a release, review the included third-party notices and
-bump both the package version in
-`pyproject.toml` and `src/splatoon_audio_converter/__init__.py`.
-
-## Develop and build
-
-Use Python 3.12 on Windows:
+The native source is in `native-app/`. The earlier Python v2 implementation stays
+in this repository for reference; it is **not shipped in v3**. No NuGet install or
+Python setup is needed for native builds. Use Windows PowerShell with the .NET
+Framework C# compiler:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install . pyinstaller
-python scripts/build_native.py
-$env:PYTHONPATH = "src"
-python -m unittest discover -s tests -p "test_*.py" -v
-python tests/smoke_ui.py
-python tests/smoke_playback.py
-python launch.py
-python -m PyInstaller --noconfirm "Splatoon Audio Converter.spec"
-python scripts/smoke_frozen.py
-python scripts/check_privacy.py dist
-python scripts/package_release.py
-python scripts/smoke_frozen.py --zip dist/Splatoon-Audio-Converter-win-x64.zip
+.\native-app\build.ps1
+.\native-app\test.ps1 -SkipBuild
+.\native-app\package.ps1
+.\native-app\smoke.ps1
 ```
 
-If an older local build is running, use a separate output directory so its
-loaded libraries are not replaced:
+Output: `native-app/dist/`. The source ZIP contains the native source, tests,
+build scripts and the small required dependencies, not old runtime bundles.
+Tests generate their own sounds; no game audio is included. Hardware playback
+checks run if an output endpoint exists; deterministic playback tests also run
+without hardware. Fresh-ZIP checks remove development/Python/Qt paths from the
+process environment and exercise every input extension plus multichannel music.
 
-```powershell
-python -m PyInstaller --noconfirm --distpath dist/v2.4.2 "Splatoon Audio Converter.spec"
-python scripts/smoke_frozen.py --dist-dir dist/v2.4.2
-python scripts/check_privacy.py dist/v2.4.2
-python scripts/package_release.py --dist-dir dist/v2.4.2
-python scripts/smoke_frozen.py --zip dist/v2.4.2/Splatoon-Audio-Converter-win-x64.zip
-```
+The included codec is built with a static C runtime, so end users do not need a
+separate Visual C++ redistributable. To rebuild that dependency from its pinned,
+checksum-verified official source, run `native-app/build-codec.ps1` with CMake and
+Visual Studio C++ build tools installed. GitHub Actions does this automatically.
 
-The build uses the included MIT-licensed `VGAudio.dll`; the helper source code is
-in `native-src/`. Rebuilding helpers needs the Windows .NET Framework C# compiler.
-The `make_test_stream` helper and generated test sounds are development fixtures
-only and are not bundled with the app.
+GitHub Actions builds/tests normal pushes and pull requests. A `v*` tag publishes
+the portable ZIP, clean source ZIP and SHA-256 checksums. The app itself performs
+no update checks; download new releases manually.
 
-The packaging script also creates a clean source ZIP, excluding local build logs,
-caches and generated test output. Use that ZIP when sharing source outside Git.
-Other private development files in `local-assets` are excluded from Git and ZIPs.
-Only the explicitly supplied interface font is included; packaging verifies that
-it matches the source asset and rejects other fonts/settings/logs.
-The end-user ZIP opens with just the executable and `_internal` folder. It has
-no START HERE or top-level documentation. Required license notices are retained
-under `_internal/licenses`; the developer README stays in the source package.
+## Privacy / credits
 
-## Privacy and redistribution
+Public packaging uses an exact allowlist: one EXE, one codec DLL and essential
+license notices under `_internal/licenses`. It rejects extra files, settings,
+logs, debug symbols, test sounds and user-profile paths. The EXE has no embedded
+build-machine paths or PDB, and package ZIP metadata has no author records.
+Audio is processed locally in memory; previews create no temporary audio files.
 
-No author machine paths are hardcoded in the application. File labels and
-activity messages show filenames, not the full local path. No telemetry is
-implemented; audio is never uploaded. The app operates offline and makes no
-update checks or other network requests. Temporary previews are cleaned on close.
+The UI arrangement is inspired by [HoianViewer by nvnprogram](https://github.com/nvnprogram/HoianViewer).
+No HoianViewer source code, art or font is included. Nintendo audio conversion
+uses [VGAudio](https://github.com/Thealexbarney/VGAudio) (MIT); compression uses
+[Zstandard](https://github.com/facebook/zstd) (BSD). Keep the included notices
+when sharing the app. The separately supplied NinDev-Treasure font is embedded
+for normal themes under its original terms, not relicensed by this project;
+see [font notes](fonts/README.md).
 
-Release checking scans normal files and decompressed frozen Python code for
-personal user-profile paths, and rejects all profile paths in application code.
-Known third-party CI/build paths and documentation examples are reported
-separately; signed upstream libraries are not modified to erase that metadata.
-Do not package the old converter directory, test
-output, local configuration, a ROMFS, or example audio from the game.
-
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Keep all third-party license
-files with the portable folder when sharing it.
-
-The project's own code is [MIT licensed](LICENSE). This project is not affiliated
-with or endorsed by Nintendo.
+Application code: [MIT](LICENSE). Not affiliated with or endorsed by Nintendo.

@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.0.0
+
+- Rebuilt the main Windows app with lightweight native controls, GDI+ waveform
+  drawing and WinMM audio. Removed the bundled Python/Qt/NumPy/FFmpeg runtimes.
+  The complete portable folder is about 1 MB, with a strict 20 MiB packaging cap.
+- Added Legacy: black background, white text, Windows system font, no gradients,
+  flat controls and no Quick Guide. Audio features remain available in every theme.
+- Kept Aqua, Beige, Dark Aero, Dorfic (default) and Eco with the supplied font.
+- Retained raw/compressed BARS, BWAV and BFSTM, waveform seeking, 300% live gain,
+  immediate restart, extraction, replacements, loops and original-file protection.
+- Fixed mixed archives with short prefetches: stored samples preview/extract while
+  their untouched payloads are retained when other editable tracks are replaced.
+- Replaced custom window chrome with native maximize/resize controls. Playback
+  runs independently of UI painting/focus and volume changes do not reload audio.
+- Public packages contain no settings, logs, game samples, debug symbols or
+  personal profile paths. Only the app, small codec and essential notices ship.
+- New procedural tests and fresh-ZIP checks cover all extensions, multichannel
+  music, replacement/loop metadata, playback and Legacy/theme switching.
+
 ## 2.4.2
 
 - Restored the supplied interface font in the app, source builds and portable ZIP.

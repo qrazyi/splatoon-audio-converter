@@ -44,6 +44,11 @@ def payloads(name, data):
                     yield from payloads(name + "!" + entry.filename, archive.read(entry))
 
 
+def is_pyinstaller(data):
+    """Only frozen Python builds have this archive cookie; v3 is a managed EXE."""
+    return b"MEI\x0c\x0b\x0a\x0b\x0e" in data
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path)
@@ -56,12 +61,12 @@ def main():
             continue
         raw = path.read_bytes()
         for name, data in payloads(path.relative_to(args.target).as_posix(), raw):
-            own = name.lower().endswith((".py", ".pyw"))
+            own = name.lower().endswith((".py", ".pyw", ".cs", ".ps1"))
             if matches(data, own_code=own, ci=args.ci):
                 failures.append(name)
             elif profile_names(data):
                 upstream_files += 1
-        if path.suffix.lower() == ".exe" and path.name == "Splatoon Audio Converter.exe":
+        if path.suffix.lower() == ".exe" and path.name == "Splatoon Audio Converter.exe" and is_pyinstaller(raw):
             from PyInstaller.archive.readers import CArchiveReader
             reader = CArchiveReader(str(path))
             for name, entry in reader.toc.items():
