@@ -15,7 +15,7 @@ $build=Join-Path $work 'compiled'
 if($LASTEXITCODE -ne 0){throw 'Codec configuration failed. Install CMake and the Visual Studio C++ build tools.'}
 & cmake --build $build --config MinSizeRel --target libzstd_shared --parallel
 if($LASTEXITCODE -ne 0){throw 'Codec build failed.'}
-$library=@(Get-ChildItem -LiteralPath $build -Recurse -File -Filter 'libzstd.dll' | Where-Object {$_.Directory.Name -eq 'MinSizeRel'})
+$library=@(Get-ChildItem -LiteralPath $build -Recurse -File -Filter 'zstd.dll' | Where-Object {$_.Directory.Name -eq 'MinSizeRel'})
 if($library.Count -ne 1){throw 'Expected exactly one release codec DLL.'}
 Copy-Item -LiteralPath $library[0].FullName -Destination (Join-Path $PSScriptRoot 'vendor\zstd.dll') -Force
 Write-Output 'Built codec with static C runtime: no separate Visual C++ redistributable needed.'
