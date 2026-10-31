@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.3
+
+- Fixed Windows theme persistence using per-user native settings instead of the
+  roaming INI writer. Existing INI preferences are read without modifying them.
+- Fresh settings objects, one retry and explicit readback verification prevent a
+  previous QSettings error from making later successful saves report failure.
+- Added failure/retry/migration tests, separate-process persistence verification,
+  and real theme-action/reopened-window checks that reject save-warning dialogs.
+- Kept the original v2.4.2 interface, font, themes, layout and audio engine.
+  Conservative smaller-package exclusions remain enabled.
+
 ## v2.4.2 smaller repack — supported version
 
 - Restored the exact original v2.4.2 interface and audio engine. The native v3

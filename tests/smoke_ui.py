@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import time
+import uuid
 from unittest.mock import patch
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from PySide6.QtMultimedia import QMediaDevices, QMediaPlayer
 from splatoon_audio_converter.ui import MainWindow
 from splatoon_audio_converter.fonts import configure
 from splatoon_audio_converter.preferences import AppearanceSettings
+from splatoon_audio_converter import preferences as preference_module
 from splatoon_audio_converter.theme import PALETTES
 from fixtures import bars, replacement_wav
 
@@ -152,7 +154,42 @@ def main():
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         app.processEvents()
     preferences_folder.cleanup()
+    if sys.platform == "win32":
+        # Exercise the production native-settings path through the real theme
+        # actions, not only the explicit INI backend used by the tests above.
+        test_name = "UiPreferenceTests-" + uuid.uuid4().hex
+        with patch.object(preference_module, "APPLICATION", test_name):
+            settings = AppearanceSettings()
+            persistent = MainWindow(settings)
+            persistent.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+            persistent.show()
+            app.processEvents()
+            try:
+                with patch("splatoon_audio_converter.ui.QMessageBox.warning") as warning:
+                    for name in PALETTES:
+                        persistent.theme_actions[name].trigger()
+                        app.processEvents()
+                        assert AppearanceSettings().theme == name
+                    warning.assert_not_called()
+                persistent.close()
+                persistent.pool.waitForDone()
+                reopened = MainWindow(AppearanceSettings())
+                reopened.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+                try:
+                    assert reopened.theme_name == "Eco", "Saved theme was lost on window restart"
+                finally:
+                    reopened.close()
+                    reopened.pool.waitForDone()
+                    reopened.deleteLater()
+            finally:
+                persistent.close()
+                persistent.deleteLater()
+                settings.store.clear()
+                settings.store.sync()
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                app.processEvents()
     print("PASS: opaque UI, five exact gradient themes, Dorfic default, rounded native theme popup, audio controls and fullscreen cursor recovery.")
+    print("PASS: native Windows theme saves verified after every menu action and after reopening; no save-warning dialog.")
 
 
 if __name__ == "__main__":

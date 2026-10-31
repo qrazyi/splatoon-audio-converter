@@ -2,12 +2,13 @@
 
 Extract WAVs, replace audio tracks or preview sounds.
 
-The supported app is the original **v2.4.2 Qt interface**, including its supplied
+The supported app keeps the original **v2.4.2 Qt interface**, including its supplied
 font, rounded controls, waveform, title bar, themes and audio engine. The native
 v3 rewrite is withdrawn from the recommended download; `native-app/` is retained
-only as an unused experiment. It is not the default build.
+only as an unused experiment. It is not the default build. Version **2.4.3** fixes
+theme-preference saving without changing the interface.
 
-[Download smaller original version](https://github.com/qrazyi/splatoon-audio-converter/releases/download/v2.4.2/Splatoon-Audio-Converter-v2.4.2-smaller-win-x64.zip)
+[Download latest fixed original-interface version](https://github.com/qrazyi/splatoon-audio-converter/releases/latest)
 · [Issues](https://github.com/qrazyi/splatoon-audio-converter/issues)
 
 ![Original interface](docs/preview.png)
@@ -54,6 +55,10 @@ Ctrl+R restart, Ctrl+Shift+S save a new file.
 
 Themes are unchanged: Aqua, Beige, Dark Aero, Dorfic (default), Eco. No new UI
 design is applied. The app works offline, with no updater, uploads or GitHub button.
+On Windows, only the selected theme is saved under the current user's application
+registry settings; no admin rights or writable roaming INI file are needed. An
+existing INI theme is retained until a new choice is saved. Audio paths and recent
+files are never stored.
 
 ## Develop / package
 
